@@ -1,57 +1,62 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import * as api from './api.js'
-import { useAuth } from './context/AuthContext.jsx'
 import Header from './components/Header.jsx'
-import AuthForm from './components/AuthForm.jsx'
-import Top from './components/Top.jsx'
-import SubmitSighting from './components/SubmitSighting.jsx'
-import Ranking from './components/Ranking.jsx'
-import TimeRanking from './components/TimeRanking.jsx'
-import History from './components/History.jsx'
+import RankingList from './components/RankingList.jsx'
+import SubmitCard from './components/SubmitCard.jsx'
+import TopCard from './components/TopCard.jsx'
+import { formatDuration } from './format.js'
 
-const App = () => {
-  const { username } = useAuth()
+export default function App () {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
 
-  const [top, setTop] = useState(null)
-  const [ranking, setRanking] = useState([])
-  const [timeRanking, setTimeRanking] = useState([])
-  const [history, setHistory] = useState([])
-
-  // reloads the whole game state; called on startup and after each upload
-  const refresh = useCallback(async () => {
-    const [newTop, newRanking, newTimeRanking, newHistory] = await Promise.all([
-      api.getTop(),
-      api.getRanking(),
-      api.getTimeRanking(),
-      api.getHistory()
-    ])
-    setTop(newTop)
-    setRanking(newRanking)
-    setTimeRanking(newTimeRanking)
-    setHistory(newHistory)
+  const load = useCallback(async () => {
+    try {
+      const [top, ranking, timeRanking] = await Promise.all([
+        api.getTop(), api.getRanking(), api.getTimeRanking()
+      ])
+      setData({ top, ranking, timeRanking })
+      setError(null)
+    } catch (e) {
+      setError(e.message === 'Failed to fetch' ? 'Could not reach the server.' : e.message)
+    }
   }, [])
 
-  useEffect(() => {
-    refresh()
-  }, [refresh])
+  useEffect(() => { load() }, [load])
+
+  const sightings = data?.ranking.find((r) => r.username === data.top?.user)?.tops ?? 0
 
   return (
     <>
       <Header />
-      <main>
-        <Top top={top} />
-        {username
-          ? <SubmitSighting onSubmitted={refresh} />
-          : <AuthForm />}
-        <div className='rankings'>
-          <Ranking ranking={ranking} />
-          <TimeRanking ranking={timeRanking} />
-        </div>
-        <History history={history} />
+      <main className='page'>
+        {error && <p className='error' role='alert'>{error}</p>}
+        {!data && !error && <p className='muted'>Loading…</p>}
+        {data && (
+          <>
+            <div className='row'>
+              <TopCard top={data.top} sightings={sightings} />
+            </div>
+            <div className='row'>
+              <div className='narrow'><SubmitCard onSubmitted={load} /></div>
+              <section className='card wide' id='rankings'>
+                <div className='label'>Rankings</div>
+                <div className='rankings'>
+                  <RankingList
+                    title='Most sightings'
+                    rows={data.ranking.map((r) => ({ name: r.username, value: r.tops }))}
+                  />
+                  <RankingList
+                    title='Most time as top'
+                    rows={data.timeRanking.map((r) => ({ name: r.username, value: formatDuration(r.totalMs) }))}
+                  />
+                </div>
+              </section>
+            </div>
+          </>
+        )}
       </main>
     </>
   )
 }
-
-export default App
