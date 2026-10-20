@@ -31,26 +31,30 @@ describe('isValidPlate', () => {
 })
 
 describe('sortKey', () => {
-  test('is lastLetters-digits-firstLetters', () => {
-    assert.equal(logic.sortKey('AB123CD'), 'CD-123-AB')
+  test('is firstLetters-digits-lastLetters', () => {
+    assert.equal(logic.sortKey('AB123CD'), 'AB-123-CD')
   })
 })
 
 describe('isNewerThan', () => {
-  test('last letters weigh the most', () => {
-    assert.equal(logic.isNewerThan('AA999AB', 'ZZ999AA'), true)
+  test('first letters weigh the most', () => {
+    assert.equal(logic.isNewerThan('AB000AA', 'AA999ZZ'), true)
   })
 
   test('then the digits', () => {
-    assert.equal(logic.isNewerThan('AA124AA', 'ZZ123AA'), true)
+    assert.equal(logic.isNewerThan('AA001AA', 'AA000ZZ'), true)
   })
 
-  test('then the first letters', () => {
-    assert.equal(logic.isNewerThan('AB123AA', 'AA123AA'), true)
+  test('then the last letters', () => {
+    assert.equal(logic.isNewerThan('AA000AB', 'AA000AA'), true)
+  })
+
+  test('the last letters roll over before the digits advance', () => {
+    assert.equal(logic.isNewerThan('AA001AA', 'AA000AB'), true)
   })
 
   test('an older plate is not newer', () => {
-    assert.equal(logic.isNewerThan('AA123AA', 'AB123AA'), false)
+    assert.equal(logic.isNewerThan('AA000AB', 'AA001AA'), false)
   })
 
   test('the same plate is not newer than itself', () => {

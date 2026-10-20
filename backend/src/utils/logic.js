@@ -17,7 +17,7 @@ const sortKey = (plate) => {
   const numbers = plate.slice(2, 5)
   const lastCharts = plate.slice(5, 7)
 
-  return `${lastCharts}-${numbers}-${firstCharts}`
+  return `${firstCharts}-${numbers}-${lastCharts}`
 }
 
 const isNewerThan = (a, b) => {
