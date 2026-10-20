@@ -10,6 +10,9 @@ import middlewares from './utils/middlewares.js'
 
 const app = express()
 
+// front build: before the rate limit, so loading the page doesn't use up the quota
+app.use(express.static('dist'))
+
 // basic global rate limit per IP: 100 requests every 15 minutes
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
