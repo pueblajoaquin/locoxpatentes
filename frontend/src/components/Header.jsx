@@ -5,15 +5,18 @@ export default function Header () {
 
   return (
     <header className='header'>
-      <a className='logo' href='#top'>Caza de Patentes</a>
+      <a className='logo' href='#top'>
+        <img className='logo-img' src='/favicon.svg' alt='' />
+        LocoxPatentes
+      </a>
       <nav className='nav'>
-        <a href='#top'>Current top</a>
-        <a href='#submit'>Submit</a>
+        <a href='#top'>Punta actual</a>
+        <a href='#submit'>Enviar</a>
         <a href='#rankings'>Rankings</a>
       </nav>
       {username && (
         <button type='button' className='link-button' onClick={logout}>
-          {username} · Log out
+          {username} · Cerrar sesión
         </button>
       )}
     </header>

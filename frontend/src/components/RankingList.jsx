@@ -3,7 +3,7 @@ export default function RankingList ({ title, rows }) {
     <div className='ranking'>
       <h3>{title}</h3>
       {rows.length === 0
-        ? <p className='muted'>Nothing here yet.</p>
+        ? <p className='muted'>Todavía no hay nada.</p>
         : (
           <ol>
             {rows.slice(0, 5).map((row, i) => (

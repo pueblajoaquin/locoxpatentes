@@ -19,7 +19,7 @@ export default function App () {
       setData({ top, ranking, timeRanking })
       setError(null)
     } catch (e) {
-      setError(e.message === 'Failed to fetch' ? 'Could not reach the server.' : e.message)
+      setError(e.message === 'Failed to fetch' ? 'No se pudo conectar con el servidor.' : e.message)
     }
   }, [])
 
@@ -32,7 +32,7 @@ export default function App () {
       <Header />
       <main className='page'>
         {error && <p className='error' role='alert'>{error}</p>}
-        {!data && !error && <p className='muted'>Loading…</p>}
+        {!data && !error && <p className='muted'>Cargando…</p>}
         {data && (
           <>
             <div className='row'>
@@ -44,11 +44,11 @@ export default function App () {
                 <div className='label'>Rankings</div>
                 <div className='rankings'>
                   <RankingList
-                    title='Most sightings'
+                    title='Más avistamientos'
                     rows={data.ranking.map((r) => ({ name: r.username, value: r.tops }))}
                   />
                   <RankingList
-                    title='Most time as top'
+                    title='Más tiempo como punta'
                     rows={data.timeRanking.map((r) => ({ name: r.username, value: formatDuration(r.totalMs) }))}
                   />
                 </div>

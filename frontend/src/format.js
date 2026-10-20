@@ -13,4 +13,4 @@ export const formatDuration = (ms) => {
 }
 
 export const formatDate = (iso) =>
-  new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  new Date(iso).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' })

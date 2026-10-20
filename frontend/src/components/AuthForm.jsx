@@ -25,15 +25,15 @@ export default function AuthForm () {
 
   return (
     <form onSubmit={submit}>
-      <p className='muted'>Log in to submit a sighting.</p>
-      <label htmlFor='auth-name'>Username</label>
+      <p className='muted'>Iniciá sesión para enviar un avistamiento.</p>
+      <label htmlFor='auth-name'>Usuario</label>
       <input id='auth-name' className='input' value={name} onChange={(e) => setName(e.target.value)} autoComplete='username' required />
-      <label htmlFor='auth-password'>Password</label>
+      <label htmlFor='auth-password'>Contraseña</label>
       <input id='auth-password' className='input' type='password' value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required />
       {error && <p className='error' role='alert'>{error}</p>}
-      <button className='button' disabled={busy}>{mode === 'login' ? 'Log in' : 'Sign up'}</button>
+      <button className='button' disabled={busy}>{mode === 'login' ? 'Iniciar sesión' : 'Registrarme'}</button>
       <button type='button' className='link-button' onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-        {mode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Log in'}
+        {mode === 'login' ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Iniciá sesión'}
       </button>
     </form>
   )

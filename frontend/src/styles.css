@@ -30,7 +30,8 @@ a { color: inherit; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px;
   max-width: 1200px; margin: 0 auto; padding: 20px 16px;
 }
-.logo { font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-decoration: none; margin-right: auto; }
+.logo { display: inline-flex; align-items: center; gap: 10px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-decoration: none; margin-right: auto; }
+.logo-img { height: 44px; width: auto; }
 .nav { display: flex; gap: 20px; }
 .nav a { color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 .nav a:hover { color: var(--text); }

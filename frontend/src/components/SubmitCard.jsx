@@ -19,7 +19,7 @@ export default function SubmitCard ({ onSubmitted }) {
     try {
       const normalized = plate.replace(/[\s-]/g, '').toUpperCase()
       await api.postSighting(normalized, photo)
-      setResult({ ok: true, text: 'You are the new top!' })
+      setResult({ ok: true, text: '¡Sos la nueva punta!' })
       setPlate('')
       setPhoto(null)
       form.reset()
@@ -33,12 +33,12 @@ export default function SubmitCard ({ onSubmitted }) {
 
   return (
     <section className='card' id='submit'>
-      <div className='label'>Submit sighting</div>
+      <div className='label'>Enviar avistamiento</div>
       {!username
         ? <AuthForm />
         : (
           <form onSubmit={submit}>
-            <label htmlFor='plate'>License plate</label>
+            <label htmlFor='plate'>Patente</label>
             <input
               id='plate'
               className='plate-input'
@@ -49,7 +49,7 @@ export default function SubmitCard ({ onSubmitted }) {
               autoComplete='off'
               required
             />
-            <label htmlFor='photo'>Photo</label>
+            <label htmlFor='photo'>Foto</label>
             <input
               id='photo'
               className='file-input'
@@ -58,9 +58,9 @@ export default function SubmitCard ({ onSubmitted }) {
               onChange={(e) => setPhoto(e.target.files[0] ?? null)}
               required
             />
-            <p className='muted help'>It only counts if it is newer than the current top. If it is, you become the new top.</p>
+            <p className='muted help'>Solo cuenta si es más nueva que la punta actual. Si lo es, te convertís en la nueva punta.</p>
             {result && <p className={result.ok ? 'success' : 'error'} role='alert'>{result.text}</p>}
-            <button className='button' disabled={busy || !photo}>{busy ? 'Sending…' : 'Submit'}</button>
+            <button className='button' disabled={busy || !photo}>{busy ? 'Enviando…' : 'Enviar'}</button>
           </form>
           )}
     </section>
