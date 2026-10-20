@@ -186,6 +186,15 @@ describe('POST /api/sightings', () => {
     assert.equal(res.status, 201)
   })
 
+  test('advances the last letters first, then the digits', async () => {
+    const token = await tokenFor()
+    await postSighting(token, 'AA000AB')
+    const older = await postSighting(token, 'AA000AA')
+    const newer = await postSighting(token, 'AA001AA')
+    assert.equal(older.status, 422)
+    assert.equal(newer.status, 201)
+  })
+
   test('deletes the uploaded photo when the sighting is rejected', async () => {
     const token = await tokenFor()
     await postSighting(token, 'AB123CD')
