@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="255 -83 900 900" role="img" aria-label="Trofeo con patente argentina">
+  <defs>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#c9972f"/>
+      <stop offset=".35" stop-color="#f7e48f"/>
+      <stop offset=".65" stop-color="#e6bf55"/>
+      <stop offset="1" stop-color="#b07d22"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c8922e"/>
+      <stop offset="1" stop-color="#a8751f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- laurel -->
+  <g><path d="M468,48 C298,150 285,430 592,628" fill="none" stroke="#b07d22" stroke-width="7" stroke-linecap="round"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(448.4,61.1) rotate(365.6) scale(0.93)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(448.4,61.1) rotate(461.6) scale(0.93)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(408.9,97.5) rotate(352.9) scale(1.00)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(408.9,97.5) rotate(448.9) scale(1.00)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(378.7,141.4) rotate(340.2) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(378.7,141.4) rotate(436.2) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(358.5,191.5) rotate(327.7) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(358.5,191.5) rotate(423.7) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(349.2,246.5) rotate(315.6) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(349.2,246.5) rotate(411.6) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(351.6,305.2) rotate(304.0) scale(1.15)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(351.6,305.2) rotate(400.0) scale(1.15)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(366.3,366.3) rotate(293.1) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(366.3,366.3) rotate(389.1) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(394.3,428.6) rotate(282.9) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(394.3,428.6) rotate(378.9) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(436.2,490.8) rotate(273.4) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(436.2,490.8) rotate(369.4) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(492.9,551.7) rotate(264.9) scale(0.99)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(492.9,551.7) rotate(360.9) scale(0.99)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(565.2,610.0) rotate(257.1) scale(0.92)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(565.2,610.0) rotate(353.1) scale(0.92)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(468.0,48.0) rotate(239.0) scale(1.00)" fill="url(#leaf)"/></g>
+  <g transform="translate(1410,0) scale(-1,1)"><path d="M468,48 C298,150 285,430 592,628" fill="none" stroke="#b07d22" stroke-width="7" stroke-linecap="round"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(448.4,61.1) rotate(365.6) scale(0.93)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(448.4,61.1) rotate(461.6) scale(0.93)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(408.9,97.5) rotate(352.9) scale(1.00)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(408.9,97.5) rotate(448.9) scale(1.00)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(378.7,141.4) rotate(340.2) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(378.7,141.4) rotate(436.2) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(358.5,191.5) rotate(327.7) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(358.5,191.5) rotate(423.7) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(349.2,246.5) rotate(315.6) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(349.2,246.5) rotate(411.6) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(351.6,305.2) rotate(304.0) scale(1.15)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(351.6,305.2) rotate(400.0) scale(1.15)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(366.3,366.3) rotate(293.1) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(366.3,366.3) rotate(389.1) scale(1.14)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(394.3,428.6) rotate(282.9) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(394.3,428.6) rotate(378.9) scale(1.11)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(436.2,490.8) rotate(273.4) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(436.2,490.8) rotate(369.4) scale(1.06)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(492.9,551.7) rotate(264.9) scale(0.99)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(492.9,551.7) rotate(360.9) scale(0.99)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(565.2,610.0) rotate(257.1) scale(0.92)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(565.2,610.0) rotate(353.1) scale(0.92)" fill="url(#leaf)"/><path d="M0,0 C 22,-18 22,-52 0,-82 C -22,-52 -22,-18 0,0 Z" transform="translate(468.0,48.0) rotate(239.0) scale(1.00)" fill="url(#leaf)"/></g>
+
+  <!-- copa: asas -->
+  <g fill="none" stroke="#d9ac43" stroke-width="18" stroke-linecap="round">
+    <path d="M540,152 C470,140 420,175 432,235 C438,272 455,292 472,302"/>
+    <path d="M870,152 C940,140 990,175 978,235 C972,272 955,292 938,302"/>
+  </g>
+  <!-- copa: cuerpo -->
+  <path d="M537,135 H873 L862,230 H548 Z" fill="url(#gold)"/>
+  <rect x="527" y="118" width="356" height="22" rx="9" fill="url(#gold)"/>
+  <!-- pie y base -->
+  <path d="M655,510 H755 L745,588 Q745,604 790,610 Q832,624 842,664 L856,690 V712 H553 V690 L568,664 Q580,624 622,610 Q665,604 665,588 Z" fill="url(#gold)"/>
+  <!-- sol de mayo -->
+  <g transform="translate(705,660)">
+    <g stroke="#b07d22" stroke-width="3" stroke-linecap="round">
+      <line x1="22.0" y1="0.0" x2="34.0" y2="0.0"/><line x1="21.3" y1="5.7" x2="32.8" y2="8.8"/><line x1="19.1" y1="11.0" x2="29.4" y2="17.0"/><line x1="15.6" y1="15.6" x2="24.0" y2="24.0"/><line x1="11.0" y1="19.1" x2="17.0" y2="29.4"/><line x1="5.7" y1="21.3" x2="8.8" y2="32.8"/><line x1="0.0" y1="22.0" x2="0.0" y2="34.0"/><line x1="-5.7" y1="21.3" x2="-8.8" y2="32.8"/><line x1="-11.0" y1="19.1" x2="-17.0" y2="29.4"/><line x1="-15.6" y1="15.6" x2="-24.0" y2="24.0"/><line x1="-19.1" y1="11.0" x2="-29.4" y2="17.0"/><line x1="-21.3" y1="5.7" x2="-32.8" y2="8.8"/><line x1="-22.0" y1="0.0" x2="-34.0" y2="0.0"/><line x1="-21.3" y1="-5.7" x2="-32.8" y2="-8.8"/><line x1="-19.1" y1="-11.0" x2="-29.4" y2="-17.0"/><line x1="-15.6" y1="-15.6" x2="-24.0" y2="-24.0"/><line x1="-11.0" y1="-19.1" x2="-17.0" y2="-29.4"/><line x1="-5.7" y1="-21.3" x2="-8.8" y2="-32.8"/><line x1="-0.0" y1="-22.0" x2="-0.0" y2="-34.0"/><line x1="5.7" y1="-21.3" x2="8.8" y2="-32.8"/><line x1="11.0" y1="-19.1" x2="17.0" y2="-29.4"/><line x1="15.6" y1="-15.6" x2="24.0" y2="-24.0"/><line x1="19.1" y1="-11.0" x2="29.4" y2="-17.0"/><line x1="21.3" y1="-5.7" x2="32.8" y2="-8.8"/>
+    </g>
+    <circle r="20" fill="#e6bf55" stroke="#b07d22" stroke-width="2"/>
+  </g>
+
+  <!-- patente -->
+  <rect x="465" y="224" width="478" height="290" rx="22" fill="#fff" stroke="#111" stroke-width="9"/>
+  <path d="M470,296 V246 Q470,230 486,230 H922 Q938,230 938,246 V296 Z" fill="#4a86c5"/>
+  <!-- banderas -->
+  <g id="flag">
+    <rect x="487" y="244" width="60" height="36" fill="#fff"/>
+    <rect x="487" y="244" width="60" height="12" fill="#74acdf"/>
+    <rect x="487" y="268" width="60" height="12" fill="#74acdf"/>
+    <circle cx="517" cy="262" r="4" fill="#f6b40e"/>
+  </g>
+  <use href="#flag" x="375"/>
+  <text x="705" y="278" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-weight="600" font-size="40" fill="#fff" letter-spacing="1">ARGENTINA</text>
+
+  <!-- LXP -->
+  <g fill="#111">
+    <polygon points="543,318 580,318 580,449 642,449 642,481 543,481"/>
+    <polygon points="650,318 692,318 705,345 718,318 760,318 727,399 762,481 720,481 705,452 690,481 648,481 683,399"/>
+    <path d="M778,318 H832 Q868,318 868,366 Q868,414 832,414 H814 V481 H778 Z M814,348 V384 H828 Q834,384 834,366 Q834,348 828,348 Z" fill-rule="evenodd"/>
+  </g>
+</svg>
