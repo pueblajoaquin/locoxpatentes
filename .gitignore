@@ -1,11 +1,16 @@
 node_modules/
 
 .env
+.env.*
+!.env.example
 
 backend/.vscode/settings.json
 
-uploads/
+# uploaded photos: keep only the folder itself
+backend/uploads/*
+!backend/uploads/.gitkeep
 
+# front build (backend/dist is generated on the VPS)
 dist/
 
 build/
