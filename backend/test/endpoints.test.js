@@ -258,14 +258,23 @@ describe('GET /api/top, /api/history and /api/ranking', () => {
 })
 
 describe('GET /uploads', () => {
-  test('stores the file by mimetype, ignoring a malicious original name, and serves it with nosniff', async () => {
+  test('rejects a disallowed original extension even with an image mimetype', async () => {
     const token = await tokenFor()
     const res = await postSighting(token, 'AB123CD', {
       buffer: Buffer.from('<script>alert(1)</script>'),
       filename: 'evil.html',
       contentType: 'image/png'
     })
+    assert.equal(res.status, 400)
+  })
+
+  test('stores the file under a server-generated name and serves it with nosniff', async () => {
+    const token = await tokenFor()
+    const res = await postSighting(token, 'AB123CD', {
+      filename: '../../evil name.PNG'
+    })
     assert.equal(res.status, 201)
+    assert.doesNotMatch(res.body.photoUrl, /evil/)
     assert.match(res.body.photoUrl, /\.png$/)
 
     const file = await api.get(res.body.photoUrl)

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid'
 import path from 'node:path'
 import fs from 'node:fs'
 
+import config from './config.js'
+
 // single source of truth: allowed mimetypes and the extension each one gets
 const EXTENSIONS = {
   'image/jpeg': '.jpg',
@@ -10,12 +12,11 @@ const EXTENSIONS = {
   'image/webp': '.webp'
 }
 
-const uploadDir = path.resolve('uploads')
+// absolute path: does not depend on the directory the process was started from
+export const uploadDir = path.join(import.meta.dirname, '..', '..', 'uploads')
 
 // create the folder if it does not exist: multer does not create it
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir)
-}
+fs.mkdirSync(uploadDir, { recursive: true })
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -27,8 +28,12 @@ const storage = multer.diskStorage({
   }
 })
 
+const ALLOWED_ORIGINAL_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
+
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype in EXTENSIONS) {
+  // both the declared mimetype and the original extension must be allowed
+  const extension = path.extname(file.originalname).toLowerCase()
+  if (file.mimetype in EXTENSIONS && ALLOWED_ORIGINAL_EXTENSIONS.includes(extension)) {
     cb(null, true)
   } else {
     // MulterError so the errorHandler translates it into a 400
@@ -39,7 +44,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
+  limits: { fileSize: config.MAX_UPLOAD_MB * 1024 * 1024 }
 })
 
 export default upload

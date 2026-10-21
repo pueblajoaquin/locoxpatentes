@@ -5,7 +5,8 @@ import path from 'node:path'
 import Sighting from '../models/sighting.model.js'
 import plateLogic from '../utils/logic.js'
 import middlewares from '../utils/middlewares.js'
-import upload from '../utils/upload.js'
+import upload, { uploadDir } from '../utils/upload.js'
+import logger from '../utils/logger.js'
 
 const sightingRoutes = Router()
 
@@ -15,6 +16,14 @@ const removeUploadedFile = (file) => {
   if (file?.path) {
     fs.unlink(file.path, () => {}) // best-effort: if it no longer exists, it doesn't matter
   }
+}
+
+// same for the photo of a saved sighting that is no longer the top; a missing file is not an error
+// (only the basename is used, so a stale absolute path can't point outside uploads)
+const removeStoredFile = (photoPath) => {
+  fs.promises.unlink(path.join(uploadDir, path.basename(photoPath))).catch((error) => {
+    if (error.code !== 'ENOENT') logger.error(error.message)
+  })
 }
 
 // the user comes from the JWT, not from the body
@@ -75,6 +84,9 @@ sightingRoutes.post('/', middlewares.tokenExtractor, middlewares.userExtractor, 
       throw error
     }
     saved = true
+
+    // only the photo of the current top is kept: the previous one is no longer needed
+    if (currentTop) removeStoredFile(currentTop.photoPath)
 
     const populated = await sighting.populate('user', 'username')
 
