@@ -45,7 +45,7 @@ const errorHandler = (error, req, res, next) => {
   // multer errors: file type not allowed or size exceeded
   if (error.name === 'MulterError') {
     const message = error.code === 'LIMIT_FILE_SIZE'
-      ? 'The image exceeds the 5 MB limit.'
+      ? `The image exceeds the ${config.MAX_UPLOAD_MB} MB limit.`
       : 'Image format not allowed. Use JPEG, PNG or WebP.'
     return res.status(400).json({ error: message })
   }
