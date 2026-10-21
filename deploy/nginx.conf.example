@@ -1,0 +1,24 @@
+# /etc/nginx/sites-available/locoxpatentes  (replace tudominio.com)
+# Certbot (`certbot --nginx -d tudominio.com`) edits this file: it adds the
+# `listen 443 ssl` block with the certificates and the HTTP -> HTTPS redirect.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name tudominio.com;
+
+    # slightly above MAX_UPLOAD_MB (5) to leave room for the multipart overhead
+    client_max_body_size 6m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;   # same as PORT in backend/.env
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+}
+
+# <-- Certbot adds the HTTPS (443) server block here
