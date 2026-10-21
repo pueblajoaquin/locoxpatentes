@@ -1,3 +1,4 @@
 import neostandard from 'neostandard'
 
-export default neostandard({})
+// dist is the front build output, not source
+export default [{ ignores: ['dist'] }, ...neostandard({})]
