@@ -13,6 +13,11 @@ if (!config.SECRET || !config.MONGODB_URL) {
   process.exit(1)
 }
 
+if (!config.MAIL_USER || !config.MAIL_PASS || !config.APP_URL) {
+  logger.error('MAIL_USER, MAIL_PASS and APP_URL must be set')
+  process.exit(1)
+}
+
 try {
   await mongoose.connect(config.MONGODB_URL)
   logger.info('connected mongodb')
