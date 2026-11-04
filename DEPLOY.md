@@ -57,6 +57,8 @@ nano .env
 
 - `SECRET`: string largo y aleatorio (`openssl rand -hex 48`). Sin `SECRET` y `MONGODB_URL` la app no arranca.
 - `MONGODB_URL`: la cadena de Atlas.
+- `MAIL_USER` y `MAIL_PASS`: cuenta Gmail y su *contraseña de aplicación* (16 caracteres, requiere verificación en 2 pasos). `MAIL_FROM` es opcional (default `MAIL_USER`).
+- `APP_URL`: dominio público con HTTPS (ej. `https://tudominio.com`); es la base de los links de los mails. Sin `MAIL_USER`, `MAIL_PASS` y `APP_URL` la app no arranca.
 - `HOST=127.0.0.1` (no cambiar) y `PORT=3000`.
 - `MAX_UPLOAD_MB`: tamaño máximo de la foto (5 por defecto). Si lo subís, subí también `client_max_body_size` en Nginx.
 
