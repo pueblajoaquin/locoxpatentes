@@ -23,6 +23,12 @@ loginRoutes.post('', async (req, res) => {
     return res.status(401).json({ error: 'invalid username or password' })
   }
 
+  // checked after the password so the verification state isn't revealed to whoever doesn't know it
+  // (users created before emails existed have none and can still log in)
+  if (user.email && !user.emailVerified) {
+    return res.status(403).json({ error: 'email not verified' })
+  }
+
   const userForToken = {
     username,
     id: user.id
@@ -36,7 +42,9 @@ loginRoutes.post('', async (req, res) => {
 
   res.status(200).json({
     token,
-    username: user.username
+    username: user.username,
+    emailVerified: user.emailVerified,
+    hasEmail: Boolean(user.email)
   })
 })
 
