@@ -2,6 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
 import logic from '../src/utils/logic.js'
+import { createToken, hashToken } from '../src/utils/tokens.js'
 
 describe('normalizePlate', () => {
   test('uppercases and strips spaces and hyphens', () => {
@@ -108,5 +109,22 @@ describe('computeTimeRanking', () => {
     ], now)
     assert.equal(result.length, 1)
     assert.equal(result[0].totalMs, 100000)
+  })
+})
+
+describe('createToken / hashToken', () => {
+  test('returns a random hex token and its SHA-256 hash', () => {
+    const { token, hash } = createToken()
+    assert.match(token, /^[0-9a-f]{64}$/)
+    assert.match(hash, /^[0-9a-f]{64}$/)
+    assert.notEqual(token, hash)
+    assert.equal(hashToken(token), hash)
+  })
+
+  test('tokens differ between calls; the hash is deterministic', () => {
+    const a = createToken()
+    const b = createToken()
+    assert.notEqual(a.token, b.token)
+    assert.equal(hashToken(a.token), hashToken(a.token))
   })
 })
