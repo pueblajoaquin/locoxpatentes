@@ -30,6 +30,12 @@ const removeStoredFile = (photoPath) => {
 sightingRoutes.post('/', middlewares.tokenExtractor, middlewares.userExtractor, upload.single('photo'), async (req, res, next) => {
   let saved = false
   try {
+    // 0. only users with a verified email can play (users without email included)
+    if (!req.user.emailVerified) {
+      removeUploadedFile(req.file)
+      return res.status(403).json({ error: 'email verification required' })
+    }
+
     // 1. required fields present
     const { plate } = req.body
     if (!plate || !String(plate).trim()) {
