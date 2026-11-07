@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+// simple format check, shared with the controller (which answers a clearer 400)
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -20,7 +23,7 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       unique: true,
       sparse: true,
-      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email']
+      match: [EMAIL_PATTERN, 'Invalid email']
     },
     emailVerified: {
       type: Boolean,
