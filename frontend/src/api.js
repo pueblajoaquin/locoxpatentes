@@ -20,6 +20,12 @@ const MESSAGES_ES = {
   'password must be at least 3 characters long': 'La contraseña debe tener al menos 3 caracteres.',
   'token missing or invalid': 'Tu sesión venció. Volvé a iniciar sesión.',
   'user not found': 'Usuario no encontrado.',
+  'email is missing': 'Falta el correo.',
+  'invalid email': 'El correo no es válido.',
+  'That email is already registered.': 'Ese correo ya está registrado.',
+  'email not verified': 'Todavía no verificaste tu correo.',
+  'email verification required': 'Tenés que verificar tu correo para enviar avistamientos.',
+  'invalid or expired token': 'El link es inválido o venció.',
   'Too many requests, try again later.': 'Demasiados intentos, probá de nuevo más tarde.',
   'The image exceeds the 5 MB limit.': 'La imagen supera el límite de 5 MB.',
   'Image format not allowed. Use JPEG, PNG or WebP.': 'Formato de imagen no permitido. Usá JPEG, PNG o WebP.',
@@ -46,9 +52,9 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-const jsonRequest = (url, body) => request(url, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+const jsonRequest = (url, body, method = 'POST', headers = {}) => request(url, {
+  method,
+  headers: { 'Content-Type': 'application/json', ...headers },
   body: JSON.stringify(body)
 })
 
@@ -57,11 +63,30 @@ export const getHistory = () => request('/api/history')
 export const getRanking = () => request('/api/ranking')
 export const getTimeRanking = () => request('/api/ranking/time')
 
-export const register = (username, password) =>
-  jsonRequest('/api/users', { username, password })
+// registers without a session: the account stays pending until the email is verified
+export const register = (username, email, password) =>
+  jsonRequest('/api/users', { username, email, password })
 
 export const login = (username, password) =>
   jsonRequest('/api/login', { username, password })
+
+// tokens come from the links in the emails and travel in the body, never in the API URL
+export const verifyEmail = (token) =>
+  jsonRequest('/api/users/verify-email', { token })
+
+export const resetPassword = (token, password) =>
+  jsonRequest('/api/users/reset-password', { token, password })
+
+// both answer the same whether or not the email exists
+export const resendVerification = (email) =>
+  jsonRequest('/api/users/resend-verification', { email })
+
+export const forgotPassword = (email) =>
+  jsonRequest('/api/users/forgot-password', { email })
+
+// sets (or replaces) the email of the logged-in user and sends a verification link
+export const setEmail = (email) =>
+  jsonRequest('/api/users/me/email', { email }, 'PUT', authHeaders())
 
 // multipart: Content-Type is not set, the browser adds the boundary
 export const postSighting = (plate, photo) => {
