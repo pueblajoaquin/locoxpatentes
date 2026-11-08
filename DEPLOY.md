@@ -123,6 +123,7 @@ pm2 reload ecosystem.config.js
 - [ ] `node -v` ≥ 22 (v24) en el servidor.
 - [ ] `backend/dist/index.html` existe (build del front hecho).
 - [ ] `backend/.env` existe, con `SECRET` propio y `MONGODB_URL` válida (`chmod 600`).
+- [ ] `.env` tiene `MAIL_USER`, `MAIL_PASS` (contraseña de aplicación) y `APP_URL=https://tudominio.com` (sin barra final).
 - [ ] `pm2 status` muestra `locoxpatentes` en `online` y `pm2 logs` sin errores.
 - [ ] `curl -i http://127.0.0.1:3000/health` → 200.
 - [ ] `ss -tlnp | grep 3000` muestra `127.0.0.1:3000` (no `0.0.0.0`).
@@ -130,7 +131,8 @@ pm2 reload ecosystem.config.js
 - [ ] `sudo nginx -t` OK y `https://tudominio.com` carga con candado.
 - [ ] `http://tudominio.com` redirige a HTTPS.
 - [ ] `https://tudominio.com/health` → 200; una ruta del front (p. ej. `/algo`) carga la app; `/api/nada` da 404.
-- [ ] Registro, login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] Registro → llega el mail de verificación (revisar spam) y su link abre `https://tudominio.com/?verify=…` → login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] "¿Olvidaste tu contraseña?" manda el mail y el link permite cambiarla.
 - [ ] Foto de más de `MAX_UPLOAD_MB` o `.gif` → error claro (400).
 - [ ] `https://tudominio.com/uploads/` no lista archivos.
 - [ ] `pm2 startup` + `pm2 save` hechos: reiniciar el servidor (`sudo reboot`) y verificar que la app vuelve sola.
