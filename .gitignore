@@ -18,3 +18,4 @@ build/
 *.log
 
 CLAUDE.md
+.claude/*
