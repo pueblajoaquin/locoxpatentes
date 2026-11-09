@@ -4,33 +4,58 @@ import * as api from '../api.js'
 
 const AuthContext = createContext(null)
 
-// the username is stored alongside the token to show it in the header
+// stored alongside the token: the username is shown in the header and the email
+// state decides whether the user can post sightings
 const USERNAME_KEY = 'username'
+const EMAIL_VERIFIED_KEY = 'emailVerified'
+const HAS_EMAIL_KEY = 'hasEmail'
+
+// a missing key reads as false (sessions from before emails existed have no email)
+const readFlag = (key) => localStorage.getItem(key) === 'true'
 
 export const AuthProvider = ({ children }) => {
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY))
+  const [emailVerified, setEmailVerified] = useState(() => readFlag(EMAIL_VERIFIED_KEY))
+  const [hasEmail, setHasEmail] = useState(() => readFlag(HAS_EMAIL_KEY))
+
+  const saveEmailState = ({ emailVerified, hasEmail }) => {
+    localStorage.setItem(EMAIL_VERIFIED_KEY, String(Boolean(emailVerified)))
+    localStorage.setItem(HAS_EMAIL_KEY, String(Boolean(hasEmail)))
+    setEmailVerified(Boolean(emailVerified))
+    setHasEmail(Boolean(hasEmail))
+  }
 
   const login = async (name, password) => {
-    const { token, username: loggedName } = await api.login(name, password)
+    const { token, username: loggedName, emailVerified, hasEmail } = await api.login(name, password)
     api.setToken(token)
     localStorage.setItem(USERNAME_KEY, loggedName)
     setUsername(loggedName)
+    saveEmailState({ emailVerified, hasEmail })
   }
 
-  // registers and logs in right away
-  const register = async (name, password) => {
-    await api.register(name, password)
-    await login(name, password)
-  }
+  // only registers: there is no session until the email is verified
+  const register = (name, email, password) => api.register(name, email, password)
+
+  // after setting an email: a verification link is on its way
+  const markEmailPending = () => saveEmailState({ emailVerified: false, hasEmail: true })
+
+  // after opening the verification link in a browser with an open session
+  const markEmailVerified = () => saveEmailState({ emailVerified: true, hasEmail: true })
 
   const logout = () => {
     api.clearToken()
     localStorage.removeItem(USERNAME_KEY)
+    localStorage.removeItem(EMAIL_VERIFIED_KEY)
+    localStorage.removeItem(HAS_EMAIL_KEY)
     setUsername(null)
+    setEmailVerified(false)
+    setHasEmail(false)
   }
 
   return (
-    <AuthContext.Provider value={{ username, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ username, emailVerified, hasEmail, login, register, logout, markEmailPending, markEmailVerified }}
+    >
       {children}
     </AuthContext.Provider>
   )

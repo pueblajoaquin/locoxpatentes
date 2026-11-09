@@ -56,6 +56,20 @@ app.use(rateLimit({
   skip: () => process.env.NODE_ENV === 'test'
 }))
 
+// stricter limit for the routes that send mails or try tokens: 5 requests every 15 minutes
+app.use([
+  '/api/users/forgot-password',
+  '/api/users/resend-verification',
+  '/api/users/reset-password'
+], rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, try again later.' },
+  skip: () => process.env.NODE_ENV === 'test'
+}))
+
 app.use(express.json())
 
 app.use(middlewares.requestLogger)

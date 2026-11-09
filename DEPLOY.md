@@ -57,6 +57,8 @@ nano .env
 
 - `SECRET`: string largo y aleatorio (`openssl rand -hex 48`). Sin `SECRET` y `MONGODB_URL` la app no arranca.
 - `MONGODB_URL`: la cadena de Atlas.
+- `MAIL_USER` y `MAIL_PASS`: cuenta Gmail y su *contraseña de aplicación* (16 caracteres, requiere verificación en 2 pasos). `MAIL_FROM` es opcional (default `MAIL_USER`).
+- `APP_URL`: dominio público con HTTPS (ej. `https://tudominio.com`); es la base de los links de los mails. Sin `MAIL_USER`, `MAIL_PASS` y `APP_URL` la app no arranca.
 - `HOST=127.0.0.1` (no cambiar) y `PORT=3000`.
 - `MAX_UPLOAD_MB`: tamaño máximo de la foto (5 por defecto). Si lo subís, subí también `client_max_body_size` en Nginx.
 
@@ -121,6 +123,7 @@ pm2 reload ecosystem.config.js
 - [ ] `node -v` ≥ 22 (v24) en el servidor.
 - [ ] `backend/dist/index.html` existe (build del front hecho).
 - [ ] `backend/.env` existe, con `SECRET` propio y `MONGODB_URL` válida (`chmod 600`).
+- [ ] `.env` tiene `MAIL_USER`, `MAIL_PASS` (contraseña de aplicación) y `APP_URL=https://tudominio.com` (sin barra final).
 - [ ] `pm2 status` muestra `locoxpatentes` en `online` y `pm2 logs` sin errores.
 - [ ] `curl -i http://127.0.0.1:3000/health` → 200.
 - [ ] `ss -tlnp | grep 3000` muestra `127.0.0.1:3000` (no `0.0.0.0`).
@@ -128,7 +131,8 @@ pm2 reload ecosystem.config.js
 - [ ] `sudo nginx -t` OK y `https://tudominio.com` carga con candado.
 - [ ] `http://tudominio.com` redirige a HTTPS.
 - [ ] `https://tudominio.com/health` → 200; una ruta del front (p. ej. `/algo`) carga la app; `/api/nada` da 404.
-- [ ] Registro, login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] Registro → llega el mail de verificación (revisar spam) y su link abre `https://tudominio.com/?verify=…` → login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] "¿Olvidaste tu contraseña?" manda el mail y el link permite cambiarla.
 - [ ] Foto de más de `MAX_UPLOAD_MB` o `.gif` → error claro (400).
 - [ ] `https://tudominio.com/uploads/` no lista archivos.
 - [ ] `pm2 startup` + `pm2 save` hechos: reiniciar el servidor (`sudo reboot`) y verificar que la app vuelve sola.

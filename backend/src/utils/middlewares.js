@@ -55,9 +55,12 @@ const errorHandler = (error, req, res, next) => {
     return res.status(400).json({ error: error.message })
   }
 
-  // duplicate username (unique index)
+  // duplicate username or email (unique index): keyPattern says which one
   if (error.code === 11000) {
-    return res.status(409).json({ error: 'That username already exists.' })
+    const message = error.keyPattern?.email
+      ? 'That email is already registered.'
+      : 'That username already exists.'
+    return res.status(409).json({ error: message })
   }
 
   // errors raised by express/body-parser carry their own 4xx status (e.g. malformed JSON, payload too large)
