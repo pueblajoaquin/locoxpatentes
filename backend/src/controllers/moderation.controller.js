@@ -21,7 +21,7 @@ const decide = (id, moderator, fields) =>
   Sighting.findOneAndUpdate(
     { _id: id, status: 'pending' },
     { ...fields, decidedAt: new Date(), decidedBy: moderator._id },
-    { new: true }
+    { returnDocument: 'after' }
   ).populate('user', 'username email emailVerified')
 
 // fire-and-forget (send never throws): the moderator doesn't wait for the mail
