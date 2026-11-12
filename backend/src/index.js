@@ -18,6 +18,11 @@ if (!config.MAIL_USER || !config.MAIL_PASS || !config.APP_URL) {
   process.exit(1)
 }
 
+// not fatal: without moderators every sighting just stays pending
+if (config.MODERATORS.size === 0) {
+  logger.error('warning: MODERATORS is empty, nobody can approve sightings')
+}
+
 try {
   await mongoose.connect(config.MONGODB_URL)
   logger.info('connected mongodb')

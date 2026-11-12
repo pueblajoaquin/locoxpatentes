@@ -39,6 +39,16 @@ const userExtractor = async (req, res, next) => {
   next()
 }
 
+const isModerator = (user) => config.MODERATORS.has(user.username)
+
+// goes after userExtractor; the list comes from the env, so access changes with a restart, not with the JWT
+const requireModerator = (req, res, next) => {
+  if (!isModerator(req.user)) {
+    return res.status(403).json({ error: 'moderator only' })
+  }
+  next()
+}
+
 const errorHandler = (error, req, res, next) => {
   logger.error(error.message)
 
@@ -75,5 +85,7 @@ export default {
   requestLogger,
   tokenExtractor,
   userExtractor,
+  isModerator,
+  requireModerator,
   errorHandler
 }

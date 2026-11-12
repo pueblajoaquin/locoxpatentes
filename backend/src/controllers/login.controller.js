@@ -3,6 +3,7 @@ import { Router } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import config from '../utils/config.js'
+import middlewares from '../utils/middlewares.js'
 
 const loginRoutes = Router()
 
@@ -44,7 +45,9 @@ loginRoutes.post('', async (req, res) => {
     token,
     username: user.username,
     emailVerified: user.emailVerified,
-    hasEmail: Boolean(user.email)
+    hasEmail: Boolean(user.email),
+    // only for showing or hiding UI: the real check is requireModerator
+    isModerator: middlewares.isModerator(user)
   })
 })
 
