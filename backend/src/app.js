@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit'
 import userRoutes from './controllers/user.controller.js'
 import loginRoutes from './controllers/login.controller.js'
 import sightingRoutes from './controllers/sighting.controller.js'
+import moderationRoutes from './controllers/moderation.controller.js'
 import gameRoutes from './controllers/game.controller.js'
 
 import middlewares from './utils/middlewares.js'
@@ -94,6 +95,7 @@ app.use('/api', (req, res, next) => {
 app.use('/api/users', userRoutes)
 app.use('/api/login', loginRoutes)
 app.use('/api/sightings', sightingRoutes)
+app.use('/api/moderation', moderationRoutes)
 app.use('/api', gameRoutes)
 
 // SPA fallback: any other GET returns index.html (never for /api or /uploads)
