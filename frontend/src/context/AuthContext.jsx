@@ -4,11 +4,13 @@ import * as api from '../api.js'
 
 const AuthContext = createContext(null)
 
-// stored alongside the token: the username is shown in the header and the email
-// state decides whether the user can post sightings
+// stored alongside the token: the username is shown in the header, the email
+// state decides whether the user can post sightings and isModerator only
+// shows or hides the moderation UI (the backend checks the real permission)
 const USERNAME_KEY = 'username'
 const EMAIL_VERIFIED_KEY = 'emailVerified'
 const HAS_EMAIL_KEY = 'hasEmail'
+const IS_MODERATOR_KEY = 'isModerator'
 
 // a missing key reads as false (sessions from before emails existed have no email)
 const readFlag = (key) => localStorage.getItem(key) === 'true'
@@ -17,6 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [username, setUsername] = useState(localStorage.getItem(USERNAME_KEY))
   const [emailVerified, setEmailVerified] = useState(() => readFlag(EMAIL_VERIFIED_KEY))
   const [hasEmail, setHasEmail] = useState(() => readFlag(HAS_EMAIL_KEY))
+  const [isModerator, setIsModerator] = useState(() => readFlag(IS_MODERATOR_KEY))
 
   const saveEmailState = ({ emailVerified, hasEmail }) => {
     localStorage.setItem(EMAIL_VERIFIED_KEY, String(Boolean(emailVerified)))
@@ -26,10 +29,12 @@ export const AuthProvider = ({ children }) => {
   }
 
   const login = async (name, password) => {
-    const { token, username: loggedName, emailVerified, hasEmail } = await api.login(name, password)
+    const { token, username: loggedName, emailVerified, hasEmail, isModerator } = await api.login(name, password)
     api.setToken(token)
     localStorage.setItem(USERNAME_KEY, loggedName)
+    localStorage.setItem(IS_MODERATOR_KEY, String(Boolean(isModerator)))
     setUsername(loggedName)
+    setIsModerator(Boolean(isModerator))
     saveEmailState({ emailVerified, hasEmail })
   }
 
@@ -47,14 +52,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(USERNAME_KEY)
     localStorage.removeItem(EMAIL_VERIFIED_KEY)
     localStorage.removeItem(HAS_EMAIL_KEY)
+    localStorage.removeItem(IS_MODERATOR_KEY)
     setUsername(null)
     setEmailVerified(false)
     setHasEmail(false)
+    setIsModerator(false)
   }
 
   return (
     <AuthContext.Provider
-      value={{ username, emailVerified, hasEmail, login, register, logout, markEmailPending, markEmailVerified }}
+      value={{ username, emailVerified, hasEmail, isModerator, login, register, logout, markEmailPending, markEmailVerified }}
     >
       {children}
     </AuthContext.Provider>

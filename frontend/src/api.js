@@ -29,6 +29,13 @@ const MESSAGES_ES = {
   'Too many requests, try again later.': 'Demasiados intentos, probá de nuevo más tarde.',
   'The image exceeds the 5 MB limit.': 'La imagen supera el límite de 5 MB.',
   'Image format not allowed. Use JPEG, PNG or WebP.': 'Formato de imagen no permitido. Usá JPEG, PNG o WebP.',
+  'too many pending sightings': 'Ya tenés 3 envíos pendientes. Esperá a que se moderen.',
+  'already decided': 'Ese avistamiento ya fue moderado.',
+  superseded: 'Ya se aprobó una patente más nueva; quedó superada.',
+  'cannot moderate own sighting': 'No podés moderar tus propios envíos.',
+  'moderator only': 'Solo para moderadores.',
+  'sighting not found': 'Ese avistamiento no existe.',
+  'A reject reason of 1 to 300 characters is required.': 'El motivo del rechazo es obligatorio (hasta 300 caracteres).',
   'Internal server error.': 'Error interno del servidor.'
 }
 
@@ -100,3 +107,17 @@ export const postSighting = (plate, photo) => {
     body: formData
   })
 }
+
+// latest sightings of the logged-in user, whatever their status
+export const getMySightings = () =>
+  request('/api/sightings/mine', { headers: authHeaders() })
+
+// moderators only: { currentTop, items }
+export const getPending = () =>
+  request('/api/moderation/pending', { headers: authHeaders() })
+
+export const approveSighting = (id) =>
+  request(`/api/moderation/${id}/approve`, { method: 'POST', headers: authHeaders() })
+
+export const rejectSighting = (id, reason) =>
+  jsonRequest(`/api/moderation/${id}/reject`, { reason }, 'POST', authHeaders())
