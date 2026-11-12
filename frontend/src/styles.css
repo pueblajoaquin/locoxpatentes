@@ -75,6 +75,12 @@ label { display: block; margin: 16px 0 6px; font-weight: 500; }
 .button { width: 100%; min-height: 52px; margin-top: 16px; background: var(--accent); color: var(--bg); border: 0; border-radius: 12px; font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .link-button { background: none; border: 0; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 4px; }
+.button.danger { background: none; color: var(--error); border: 2px solid var(--error); }
+.button.secondary { background: none; color: var(--text); border: 2px solid var(--border-2); }
+.actions { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.actions .button { flex: 1 1 140px; }
+select.input { appearance: auto; }
+textarea.input { resize: vertical; display: block; }
 .form-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; margin-top: 4px; }
 
 /* "check your inbox" box shown above the auth forms */
@@ -93,3 +99,23 @@ label { display: block; margin: 16px 0 6px; font-weight: 500; }
 .pos.first { background: var(--accent); color: var(--bg); }
 .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .value { font-size: 22px; font-weight: 600; }
+
+/* sighting status: pending / approved / rejected / superseded */
+.badge { flex: none; border: 1px solid currentColor; border-radius: 999px; padding: 2px 12px; font: 600 15px 'Barlow Condensed', sans-serif; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+.badge.pending { color: var(--accent); }
+.badge.approved { color: var(--success); }
+.badge.rejected { color: var(--error); }
+.badge.superseded { color: var(--muted); }
+
+.my-sightings { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+.my-sightings h3 { margin: 0 0 8px; font-size: 22px; text-transform: uppercase; letter-spacing: .04em; }
+.my-sightings ul { list-style: none; margin: 0; padding: 0; }
+.my-sightings li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.my-sighting-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+
+/* moderation queue (/moderacion): big photo next to the plate to compare them */
+.mod-item { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.mod-photo { flex: 2 1 320px; min-width: 0; display: block; background: var(--surface-2); border: 1px dashed var(--border-2); border-radius: 12px; overflow: hidden; }
+.mod-photo img { display: block; width: 100%; max-height: 75vh; object-fit: contain; }
+.mod-info { flex: 1 1 280px; min-width: 0; max-width: 460px; }
+.mod-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 16px; }

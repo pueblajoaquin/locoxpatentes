@@ -3,6 +3,7 @@ import { useState } from 'react'
 import * as api from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import AuthForm from './AuthForm.jsx'
+import MySightings from './MySightings.jsx'
 import VerificationNotice from './VerificationNotice.jsx'
 
 // logged in without a verified email (e.g. accounts from before emails existed)
@@ -60,8 +61,10 @@ function AddEmailForm () {
   )
 }
 
-export default function SubmitCard ({ onSubmitted }) {
+export default function SubmitCard () {
   const { username, emailVerified, markEmailPending } = useAuth()
+  // bumped after each submission so "Mis envíos" reloads
+  const [sent, setSent] = useState(0)
   const [plate, setPlate] = useState('')
   const [photo, setPhoto] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -75,11 +78,12 @@ export default function SubmitCard ({ onSubmitted }) {
     try {
       const normalized = plate.replace(/[\s-]/g, '').toUpperCase()
       await api.postSighting(normalized, photo)
-      setResult({ ok: true, text: '¡Sos la nueva punta!' })
+      // the top doesn't change until a moderator approves it: only the user's list does
+      setResult({ ok: true, text: 'Enviado. Queda pendiente de moderación.' })
       setPlate('')
       setPhoto(null)
       form.reset()
-      onSubmitted()
+      setSent((n) => n + 1)
     } catch (e) {
       // the stored flag was stale (e.g. the email changed elsewhere): show the email form
       if (e.status === 403 && e.data?.error === 'email verification required') {
@@ -119,11 +123,12 @@ export default function SubmitCard ({ onSubmitted }) {
             onChange={(e) => setPhoto(e.target.files[0] ?? null)}
             required
           />
-          <p className='muted help'>Solo cuenta si es más nueva que la punta actual. Si lo es, te convertís en la nueva punta.</p>
+          <p className='muted help'>Solo cuenta si es más nueva que la punta actual y un moderador la aprueba.</p>
           {result && <p className={result.ok ? 'success' : 'error'} role='alert'>{result.text}</p>}
           <button className='button' disabled={busy || !photo}>{busy ? 'Enviando…' : 'Enviar'}</button>
         </form>
       )}
+      {username && emailVerified && <MySightings refreshKey={sent} />}
     </section>
   )
 }

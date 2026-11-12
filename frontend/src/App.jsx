@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 
 import * as api from './api.js'
 import Header from './components/Header.jsx'
+import ModerationPage from './components/ModerationPage.jsx'
 import RankingList from './components/RankingList.jsx'
 import ResetPasswordForm from './components/ResetPasswordForm.jsx'
 import SubmitCard from './components/SubmitCard.jsx'
 import TopCard from './components/TopCard.jsx'
 import VerifyEmail from './components/VerifyEmail.jsx'
+import { useAuth } from './context/AuthContext.jsx'
 import { formatDuration } from './format.js'
 
 // links from the emails: /?verify=<token> or /?reset=<token>
@@ -17,7 +19,11 @@ const readLinkFromUrl = () => {
   return null
 }
 
+// no router: the moderation panel is the only other view and its links reload the page
+const onModeration = window.location.pathname.replace(/\/+$/, '') === '/moderacion'
+
 export default function App () {
+  const { username, isModerator } = useAuth()
   const [link, setLink] = useState(readLinkFromUrl)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -41,7 +47,8 @@ export default function App () {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // the moderation view loads its own data
+  useEffect(() => { if (!onModeration) load() }, [load])
 
   const sightings = data?.ranking.find((r) => r.username === data.top?.user)?.tops ?? 0
 
@@ -63,6 +70,31 @@ export default function App () {
     )
   }
 
+  if (onModeration) {
+    return (
+      <>
+        <Header moderation />
+        <main className='page'>
+          {isModerator
+            ? <ModerationPage />
+            : (
+              <div className='row'>
+                <section className='card narrow'>
+                  <div className='label'>Moderación</div>
+                  <p className='muted'>
+                    {username
+                      ? 'Esta sección es solo para moderadores.'
+                      : 'Iniciá sesión con una cuenta de moderador para ver esta sección.'}
+                  </p>
+                  <a href='/'>Volver al inicio</a>
+                </section>
+              </div>
+              )}
+        </main>
+      </>
+    )
+  }
+
   return (
     <>
       <Header />
@@ -75,7 +107,7 @@ export default function App () {
               <TopCard top={data.top} sightings={sightings} />
             </div>
             <div className='row'>
-              <div className='narrow'><SubmitCard onSubmitted={load} /></div>
+              <div className='narrow'><SubmitCard /></div>
               <section className='card wide' id='rankings'>
                 <div className='label'>Rankings</div>
                 <div className='rankings'>
