@@ -7,17 +7,20 @@ import plateLogic from '../utils/logic.js'
 const gameRoutes = Router()
 
 // maps a sighting to the public response format
-const toPublic = (s) => ({
+export const toPublic = (s) => ({
   plate: s.licensePlate,
   user: s.user?.username ?? null,
   photoUrl: `/uploads/${path.basename(s.photoPath)}`,
   createdAt: s.createdAt
 })
 
-// GET /api/top: the sighting with the highest sortKey
+// only approved sightings count for the game: pending, rejected and superseded ones are invisible here
+const APPROVED = { status: 'approved' }
+
+// GET /api/top: the approved sighting with the highest sortKey
 gameRoutes.get('/top', async (req, res, next) => {
   try {
-    const top = await Sighting.findOne()
+    const top = await Sighting.findOne(APPROVED)
       .sort({ sortKey: -1 })
       .populate('user', 'username')
 
@@ -25,7 +28,10 @@ gameRoutes.get('/top', async (req, res, next) => {
       return res.status(200).json(null)
     }
 
-    return res.status(200).json(toPublic(top))
+    // since: when it became the top, which can be later than its createdAt (see logic.js)
+    const approved = await Sighting.find(APPROVED, 'createdAt').sort({ sortKey: 1 }).lean()
+
+    return res.status(200).json({ ...toPublic(top), since: plateLogic.topSince(approved) })
   } catch (error) {
     next(error)
   }
@@ -34,7 +40,7 @@ gameRoutes.get('/top', async (req, res, next) => {
 // GET /api/history: from newest to oldest
 gameRoutes.get('/history', async (req, res, next) => {
   try {
-    const sightings = await Sighting.find()
+    const sightings = await Sighting.find(APPROVED)
       .sort({ createdAt: -1 })
       .limit(50)
       .populate('user', 'username')
@@ -49,6 +55,7 @@ gameRoutes.get('/history', async (req, res, next) => {
 gameRoutes.get('/ranking', async (req, res, next) => {
   try {
     const ranking = await Sighting.aggregate([
+      { $match: APPROVED },
       { $group: { _id: '$user', tops: { $sum: 1 } } },
       { $sort: { tops: -1 } },
       {
@@ -78,8 +85,8 @@ gameRoutes.get('/ranking', async (req, res, next) => {
 // GET /api/ranking/time: total time spent as top per user, highest first
 gameRoutes.get('/ranking/time', async (req, res, next) => {
   try {
-    const sightings = await Sighting.find({}, 'user createdAt')
-      .sort({ createdAt: 1 })
+    const sightings = await Sighting.find(APPROVED, 'user createdAt')
+      .sort({ sortKey: 1 })
       .lean()
 
     const ranking = plateLogic.computeTimeRanking(sightings, new Date())
