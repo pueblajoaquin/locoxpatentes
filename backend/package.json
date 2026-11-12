@@ -10,7 +10,8 @@
     "start": "cross-env NODE_ENV=production node src/index.js",
     "dev": "cross-env NODE_ENV=development nodemon src/index.js",
     "test": "cross-env NODE_ENV=test node --test",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "migrate:moderation": "node scripts/migrate-moderation.js"
   },
   "keywords": [],
   "author": "",
