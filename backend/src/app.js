@@ -53,8 +53,9 @@ app.use(rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Too many requests, try again later.' },
-  // the endpoint tests fire more requests than one window allows
-  skip: () => process.env.NODE_ENV === 'test'
+  // off in tests (they fire more requests than one window allows) and in local
+  // development (`npm run dev`). An unset NODE_ENV keeps it on, like production
+  skip: () => ['test', 'development'].includes(process.env.NODE_ENV)
 }))
 
 // stricter limit for the routes that send mails or try tokens: 5 requests every 15 minutes
