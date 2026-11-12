@@ -112,6 +112,49 @@ const expireToken = (kind, username = 'tester') =>
 
 const findUser = (username = 'tester') => User.findOne({ username })
 
+const mySightings = (token) => withAuth(api.get('/api/sightings/mine'), token)
+
+const pendingQueue = (token) => withAuth(api.get('/api/moderation/pending'), token)
+const approveById = (token, id) => withAuth(api.post(`/api/moderation/${id}/approve`), token)
+const rejectById = (token, id, reason) => withAuth(api.post(`/api/moderation/${id}/reject`), token).send({ reason })
+
+// moderators come from config.MODERATORS (read from the env at import): tests add them by hand
+let moderatorTokens = {}
+
+// registers the moderator the first time it is asked for in a test and returns its JWT
+const loginAsModerator = async (username = 'mod1') => {
+  config.MODERATORS.add(username)
+  moderatorTokens[username] ??= await loginAsVerified(username)
+  return moderatorTokens[username]
+}
+
+const findSighting = (plate, status = 'pending') => Sighting.findOne({ licensePlate: plate, status })
+const idOf = async (plate) => (await findSighting(plate)).id
+
+// mod1 decides on the pending sighting with that plate
+const approve = async (plate) => {
+  const res = await approveById(await loginAsModerator(), await idOf(plate))
+  assert.equal(res.status, 200)
+  return res
+}
+
+const reject = async (plate, reason = 'blurry') => {
+  const res = await rejectById(await loginAsModerator(), await idOf(plate), reason)
+  assert.equal(res.status, 200)
+  return res
+}
+
+const photoExists = (sighting) => fs.existsSync(path.join(uploadDir, path.basename(sighting.photoPath)))
+
+// mails are sent after the response: wait until that many have shown up
+const waitForMails = async (count) => {
+  for (let i = 0; i < 50 && sentMails.length < count; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+const mailsTo = (username) => sentMails.filter((m) => m.to === emailOf(username))
+
 const listUploads = () => new Set(fs.readdirSync(uploadDir))
 
 // rejected photos are removed with a fire-and-forget fs.unlink: give it a moment
@@ -136,11 +179,13 @@ beforeEach(async () => {
   await User.deleteMany({})
   await Sighting.deleteMany({})
   clearSentMails()
+  moderatorTokens = {}
   uploadsBefore = listUploads()
 })
 
 // remove the photos created by the test
 afterEach(() => {
+  config.MODERATORS.clear()
   for (const file of listUploads()) {
     if (!uploadsBefore.has(file)) fs.unlinkSync(path.join(uploadDir, file))
   }
@@ -503,23 +548,65 @@ describe('POST /api/sightings', () => {
       const token = await loginAsVerified()
       const res = await postSighting(token, 'ab 123-cd')
 
-      assert.equal(res.status, 201)
+      assert.equal(res.status, 202)
       assert.equal(res.body.plate, 'AB123CD')
-      assert.equal(res.body.user, 'tester')
-      assert.match(res.body.photoUrl, /^\/uploads\/.+\.png$/)
+      assert.equal(res.body.status, 'pending')
+      assert.equal((await Sighting.findOne()).status, 'pending')
     })
 
-    test('rejects a duplicated plate with 409', async () => {
+    test('rejects a plate that is already pending or approved with 409', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AB123CD')
 
-      const res = await postSighting(token, 'AB123CD')
-      assert.equal(res.status, 409)
+      const whilePending = await postSighting(token, 'AB123CD')
+      assert.equal(whilePending.status, 409)
+
+      await approve('AB123CD')
+      const onceApproved = await postSighting(token, 'AB123CD')
+      assert.equal(onceApproved.status, 409)
     })
 
-    test('rejects a plate that is not newer than the top with 422', async () => {
+    test('a rejected plate can be sent again, by anyone', async () => {
+      const token = await loginAsVerified()
+      const other = await loginAsVerified('other')
+      await postSighting(token, 'AB123CD')
+      await reject('AB123CD')
+
+      const res = await postSighting(other, 'AB123CD')
+      assert.equal(res.status, 202)
+    })
+
+    test('rejects the 4th pending sighting of a user with 429 and deletes the photo', async () => {
+      const token = await loginAsVerified()
+      for (const plate of ['AB123CD', 'AC123CD', 'AD123CD']) {
+        assert.equal((await postSighting(token, plate)).status, 202)
+      }
+      const afterThree = listUploads()
+
+      const res = await postSighting(token, 'AE123CD')
+      assert.equal(res.status, 429)
+      assert.equal(res.body.error, 'too many pending sightings')
+
+      await waitForUnlink()
+      assert.deepEqual(listUploads(), afterThree)
+
+      // once one is decided there is room again
+      await approve('AB123CD')
+      assert.equal((await postSighting(token, 'AE123CD')).status, 202)
+    })
+
+    test('a pending sighting is not the top yet: an older plate is still accepted', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AB123CD')
+
+      const res = await postSighting(token, 'AA123CD')
+      assert.equal(res.status, 202)
+    })
+
+    test('rejects a plate that is not newer than the approved top with 422', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      await approve('AB123CD')
 
       const res = await postSighting(token, 'AA123CD')
       assert.equal(res.status, 422)
@@ -531,17 +618,18 @@ describe('POST /api/sightings', () => {
       await postSighting(token, 'AB123CD')
 
       const res = await postSighting(token, 'AC123CD')
-      assert.equal(res.status, 201)
+      assert.equal(res.status, 202)
     })
 
     test('advances the last letters first, then the digits', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AA000AB')
+      await approve('AA000AB')
 
       const older = await postSighting(token, 'AA000AA')
       const newer = await postSighting(token, 'AA001AA')
       assert.equal(older.status, 422)
-      assert.equal(newer.status, 201)
+      assert.equal(newer.status, 202)
     })
   })
 
@@ -549,6 +637,7 @@ describe('POST /api/sightings', () => {
     test('are deleted when the sighting is rejected', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AB123CD')
+      await approve('AB123CD')
       const afterFirst = listUploads()
 
       await postSighting(token, 'AA123CD') // 422
@@ -563,15 +652,94 @@ describe('POST /api/sightings', () => {
       const token = await loginAsVerified()
       const res = await postSighting(token, 'AB123CD', { filename: '../../evil name.PNG' })
 
-      assert.equal(res.status, 201)
-      assert.doesNotMatch(res.body.photoUrl, /evil/)
-      assert.match(res.body.photoUrl, /\.png$/)
+      assert.equal(res.status, 202)
 
-      const file = await api.get(res.body.photoUrl)
+      const { photoUrl } = (await mySightings(token)).body[0]
+      assert.doesNotMatch(photoUrl, /evil/)
+      assert.match(photoUrl, /^\/uploads\/.+\.png$/)
+
+      const file = await api.get(photoUrl)
       assert.equal(file.status, 200)
       assert.match(file.headers['content-type'], /image\/png/)
       assert.equal(file.headers['x-content-type-options'], 'nosniff')
     })
+  })
+})
+
+describe('mail to the moderators', () => {
+  test('a new sighting is mailed to every verified moderator except its author', async () => {
+    for (const name of ['mod1', 'mod2', 'mod3']) config.MODERATORS.add(name)
+    await registerVerified('mod1')
+    const mod2 = await loginAsVerified('mod2')
+    await register({ username: 'mod3' }) // never verifies the email
+    clearSentMails()
+
+    assert.equal((await postSighting(mod2, 'AB123CD')).status, 202)
+    await waitForMails(1)
+    await waitForUnlink() // room for a wrong extra mail to show up
+
+    assert.deepEqual(sentMails.map((m) => m.to), [emailOf('mod1')])
+    assert.match(sentMails[0].subject, /AB 123 CD/)
+    assert.match(sentMails[0].text, /mod2/)
+    assert.match(sentMails[0].text, /\/moderacion/)
+  })
+
+  test('nothing is sent when the sighting is rejected', async () => {
+    config.MODERATORS.add('mod1')
+    await registerVerified('mod1')
+    const token = await loginAsVerified()
+    clearSentMails()
+
+    assert.equal((await postSighting(token, 'ABC123')).status, 400)
+    await waitForUnlink()
+    assert.equal(sentMails.length, 0)
+  })
+})
+
+describe('GET /api/sightings/mine', () => {
+  test('requires a valid token', async () => {
+    assert.equal((await mySightings(null)).status, 401)
+  })
+
+  test('lists only the sightings of the user, newest first, with their status', async () => {
+    const token = await loginAsVerified()
+    const other = await loginAsVerified('other')
+    await postSighting(token, 'AB123CD')
+    await postSighting(other, 'AC123CD')
+    await postSighting(token, 'AD123CD')
+    await reject('AB123CD', 'blurry')
+
+    const res = await mySightings(token)
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body.map((s) => [s.plate, s.status]), [
+      ['AD123CD', 'pending'],
+      ['AB123CD', 'rejected']
+    ])
+    assert.deepEqual(Object.keys(res.body[0]).sort(), [
+      'createdAt', 'decidedAt', 'id', 'photoUrl', 'plate', 'rejectReason', 'status'
+    ])
+    assert.equal(res.body[0].rejectReason, null)
+    assert.equal(res.body[0].decidedAt, null)
+    assert.equal(res.body[1].rejectReason, 'blurry')
+    assert.ok(res.body[1].decidedAt)
+  })
+
+  test('photoUrl comes only while the photo exists: pending ones and the current top', async () => {
+    const token = await loginAsVerified()
+    await postSighting(token, 'AB123CD')
+    await postSighting(token, 'AC123CD')
+    await postSighting(token, 'AD123CD')
+    await approve('AB123CD')
+    await approve('AC123CD') // AB123CD is no longer the top
+    await reject('AD123CD')
+    await postSighting(token, 'AE123CD')
+
+    const res = await mySightings(token)
+    const photos = Object.fromEntries(res.body.map((s) => [s.plate, s.photoUrl]))
+    assert.equal(photos.AB123CD, null)
+    assert.match(photos.AC123CD, /^\/uploads\//)
+    assert.equal(photos.AD123CD, null)
+    assert.match(photos.AE123CD, /^\/uploads\//)
   })
 })
 
@@ -591,23 +759,49 @@ describe('GET /api/top, /api/history and /api/ranking', () => {
     assert.deepEqual(ranking.body, [])
   })
 
-  test('/top returns the newest plate', async () => {
+  test('/top returns the newest approved plate, with since', async () => {
     const token = await loginAsVerified()
     await postSighting(token, 'AB123CD')
     await postSighting(token, 'AC123CD')
+    await approve('AB123CD')
+    await approve('AC123CD')
 
     const res = await api.get('/api/top')
     assert.equal(res.body.plate, 'AC123CD')
     assert.equal(res.body.user, 'tester')
+    assert.equal(res.body.since, res.body.createdAt)
   })
 
   test('/history lists newest first', async () => {
     const token = await loginAsVerified()
     await postSighting(token, 'AB123CD')
     await postSighting(token, 'AC123CD')
+    await approve('AB123CD')
+    await approve('AC123CD')
 
     const res = await api.get('/api/history')
     assert.deepEqual(res.body.map((s) => s.plate), ['AC123CD', 'AB123CD'])
+  })
+
+  test('ignore pending, rejected and superseded sightings', async () => {
+    const alice = await loginAsVerified('alice')
+    const bob = await loginAsVerified('bob')
+    await postSighting(alice, 'AC123CD')
+    await postSighting(bob, 'AB123CD') // superseded once AC123CD is approved
+    await postSighting(bob, 'AD123CD') // rejected
+    await postSighting(bob, 'AE123CD') // stays pending
+    await approve('AC123CD')
+    await reject('AD123CD')
+
+    const top = await api.get('/api/top')
+    const history = await api.get('/api/history')
+    const ranking = await api.get('/api/ranking')
+    const time = await api.get('/api/ranking/time')
+
+    assert.equal(top.body.plate, 'AC123CD')
+    assert.deepEqual(history.body.map((s) => s.plate), ['AC123CD'])
+    assert.deepEqual(ranking.body, [{ username: 'alice', tops: 1 }])
+    assert.deepEqual(time.body.map((r) => r.username), ['alice'])
   })
 
   test('/ranking counts sightings per user, highest first', async () => {
@@ -616,6 +810,7 @@ describe('GET /api/top, /api/history and /api/ranking', () => {
     await postSighting(alice, 'AB123CD')
     await postSighting(bob, 'AC123CD')
     await postSighting(bob, 'AD123CD')
+    for (const plate of ['AB123CD', 'AC123CD', 'AD123CD']) await approve(plate)
 
     const res = await api.get('/api/ranking')
     assert.deepEqual(res.body, [
@@ -637,13 +832,14 @@ describe('GET /api/ranking/time', () => {
     const bob = await User.create({ username: 'bob', passwordHash: 'x' })
     const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000)
     const sighting = (user, licensePlate, createdAt) =>
-      ({ user: user._id, licensePlate, sortKey: licensePlate, photoPath: 'x.png', createdAt })
+      ({ user: user._id, licensePlate, sortKey: licensePlate, photoPath: 'x.png', createdAt, status: 'approved' })
 
     // alice: 10h -> 7h ago (3h); bob: 7h -> 2h ago (5h); alice again: 2h ago -> now (2h)
     await Sighting.create([
       sighting(alice, 'AA111AA', hoursAgo(10)),
       sighting(bob, 'AB111AA', hoursAgo(7)),
-      sighting(alice, 'AC111AA', hoursAgo(2))
+      sighting(alice, 'AC111AA', hoursAgo(2)),
+      { ...sighting(bob, 'AD111AA', hoursAgo(1)), status: 'pending' } // doesn't count
     ])
 
     const res = await api.get('/api/ranking/time')
@@ -654,6 +850,242 @@ describe('GET /api/ranking/time', () => {
     const hours = (ms) => Math.round(ms / 3600000)
     assert.equal(hours(res.body[0].totalMs), 5) // alice: 3h + 2h
     assert.equal(hours(res.body[1].totalMs), 5) // bob: 5h
+  })
+
+  test('a plate approved after a later, older one starts when that one did', async () => {
+    const alice = await User.create({ username: 'alice', passwordHash: 'x' })
+    const bob = await User.create({ username: 'bob', passwordHash: 'x' })
+    const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000)
+
+    // alice sent the newer plate first (6h ago), but bob's older one (2h ago) was the top before it
+    await Sighting.create([
+      { user: alice._id, licensePlate: 'AC111AA', sortKey: 'AC-111-AA', photoPath: 'x.png', createdAt: hoursAgo(6), status: 'approved' },
+      { user: bob._id, licensePlate: 'AB111AA', sortKey: 'AB-111-AA', photoPath: 'x.png', createdAt: hoursAgo(2), status: 'approved' }
+    ])
+
+    const time = await api.get('/api/ranking/time')
+    const hours = (ms) => Math.round(ms / 3600000)
+    assert.deepEqual(time.body.map((r) => [r.username, hours(r.totalMs)]), [['alice', 2], ['bob', 0]])
+
+    const top = await api.get('/api/top')
+    assert.equal(top.body.plate, 'AC111AA')
+    assert.equal(hours(Date.now() - new Date(top.body.since)), 2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Moderation
+// ---------------------------------------------------------------------------
+
+describe('/api/moderation', () => {
+  describe('access', () => {
+    test('requires a token (401) and a moderator (403)', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      const id = await idOf('AB123CD')
+
+      for (const request of [pendingQueue, (t) => approveById(t, id), (t) => rejectById(t, id, 'no')]) {
+        assert.equal((await request(null)).status, 401)
+        const res = await request(token)
+        assert.equal(res.status, 403)
+        assert.equal(res.body.error, 'moderator only')
+      }
+      assert.ok(await findSighting('AB123CD'))
+    })
+
+    test('the login tells whether the user is a moderator', async () => {
+      await loginAsModerator('mod1')
+      await registerVerified()
+
+      assert.equal((await login('mod1')).body.isModerator, true)
+      assert.equal((await login()).body.isModerator, false)
+    })
+  })
+
+  describe('GET /pending', () => {
+    test('lists the queue oldest first, with isOwn and newerThanTop', async () => {
+      const mod = await loginAsModerator()
+      const token = await loginAsVerified()
+      await postSighting(token, 'AC123CD')
+      await approve('AC123CD')
+      await postSighting(token, 'AE123CD')
+      await postSighting(mod, 'AD123CD')
+      // older than the top: can't be sent anymore, but it can be left behind by a later approval
+      await Sighting.create({ user: (await findUser())._id, licensePlate: 'AB123CD', sortKey: 'AB-123-CD', photoPath: 'x.png' })
+
+      const res = await pendingQueue(mod)
+      assert.equal(res.status, 200)
+      assert.equal(res.body.currentTop, 'AC123CD')
+      assert.deepEqual(
+        res.body.items.map((s) => [s.plate, s.user, s.isOwn, s.newerThanTop]),
+        [
+          ['AE123CD', 'tester', false, true],
+          ['AD123CD', 'mod1', true, true],
+          ['AB123CD', 'tester', false, false]
+        ]
+      )
+      assert.equal(res.body.items[0].id, await idOf('AE123CD'))
+      assert.match(res.body.items[0].photoUrl, /^\/uploads\/.+\.png$/)
+      assert.ok(res.body.items[0].createdAt)
+    })
+
+    test('is empty, with a null top, when there is nothing', async () => {
+      const res = await pendingQueue(await loginAsModerator())
+      assert.deepEqual(res.body, { currentTop: null, items: [] })
+    })
+  })
+
+  describe('POST /:id/approve', () => {
+    test('makes it the top, deletes the photo of the previous one and records who decided', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      await approve('AB123CD')
+      await postSighting(token, 'AC123CD')
+
+      const res = await approve('AC123CD')
+      assert.equal(res.body.plate, 'AC123CD')
+      assert.equal(res.body.user, 'tester')
+      assert.equal((await api.get('/api/top')).body.plate, 'AC123CD')
+
+      const approved = await findSighting('AC123CD', 'approved')
+      assert.ok(approved.decidedAt)
+      assert.ok(approved.decidedBy.equals((await findUser('mod1'))._id))
+
+      await waitForUnlink()
+      assert.equal(photoExists(approved), true)
+      assert.equal(photoExists(await findSighting('AB123CD', 'approved')), false)
+    })
+
+    test('supersedes the pending plates that are no longer newer, deleting their photos', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      await postSighting(token, 'AD123CD')
+      await postSighting(token, 'AE123CD')
+
+      await approve('AD123CD')
+
+      const older = await findSighting('AB123CD', 'superseded')
+      assert.ok(older)
+      assert.ok(older.decidedAt)
+      assert.ok(await findSighting('AE123CD')) // newer: still pending
+
+      await waitForUnlink()
+      assert.equal(photoExists(older), false)
+      assert.equal(photoExists(await findSighting('AE123CD')), true)
+    })
+
+    test('answers 404 to an unknown or malformed id', async () => {
+      const mod = await loginAsModerator()
+      assert.equal((await approveById(mod, new mongoose.Types.ObjectId())).status, 404)
+      assert.equal((await approveById(mod, 'not-an-id')).status, 404)
+    })
+
+    test('answers 403 to a moderator approving their own sighting, which stays pending', async () => {
+      const mod = await loginAsModerator()
+      await postSighting(mod, 'AB123CD')
+
+      const res = await approveById(mod, await idOf('AB123CD'))
+      assert.equal(res.status, 403)
+      assert.equal(res.body.error, 'cannot moderate own sighting')
+      assert.ok(await findSighting('AB123CD'))
+    })
+
+    test('answers 409 to a sighting that was already decided', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      const id = await idOf('AB123CD')
+      await approve('AB123CD')
+
+      const again = await approveById(await loginAsModerator(), id)
+      assert.equal(again.status, 409)
+      assert.equal(again.body.error, 'already decided')
+
+      const rejectIt = await rejectById(await loginAsModerator(), id, 'too late')
+      assert.equal(rejectIt.status, 409)
+      assert.equal((await findSighting('AB123CD', 'approved')).rejectReason, undefined)
+    })
+
+    test('answers 409 superseded when it is no longer newer than the top', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AC123CD')
+      await approve('AC123CD')
+      // can only happen when two approvals race: a pending plate older than the top
+      const stale = await Sighting.create({
+        user: (await findUser())._id, licensePlate: 'AB123CD', sortKey: 'AB-123-CD', photoPath: 'x.png'
+      })
+
+      const res = await approveById(await loginAsModerator(), stale.id)
+      assert.equal(res.status, 409)
+      assert.equal(res.body.error, 'superseded')
+      assert.equal(res.body.currentTop, 'AC123CD')
+      assert.ok(await findSighting('AB123CD', 'superseded'))
+      assert.equal((await api.get('/api/top')).body.plate, 'AC123CD')
+    })
+  })
+
+  describe('POST /:id/reject', () => {
+    test('requires a reason of 1 to 300 characters', async () => {
+      const mod = await loginAsModerator()
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      const id = await idOf('AB123CD')
+
+      for (const reason of [undefined, '', '   ', 42, 'x'.repeat(301)]) {
+        assert.equal((await rejectById(mod, id, reason)).status, 400)
+      }
+      assert.ok(await findSighting('AB123CD'))
+    })
+
+    test('rejects it with the trimmed reason and deletes the photo', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+
+      const res = await reject('AB123CD', '  the plate is not readable  ')
+      assert.equal(res.body.status, 'rejected')
+
+      const rejected = await findSighting('AB123CD', 'rejected')
+      assert.equal(rejected.rejectReason, 'the plate is not readable')
+      assert.ok(rejected.decidedAt)
+      assert.ok(rejected.decidedBy.equals((await findUser('mod1'))._id))
+      assert.equal((await api.get('/api/top')).body, null)
+
+      await waitForUnlink()
+      assert.equal(photoExists(rejected), false)
+    })
+
+    test('answers 404 to an unknown id and 403 to a moderator rejecting their own', async () => {
+      const mod = await loginAsModerator()
+      await postSighting(mod, 'AB123CD')
+
+      assert.equal((await rejectById(mod, new mongoose.Types.ObjectId(), 'no')).status, 404)
+      assert.equal((await rejectById(mod, await idOf('AB123CD'), 'no')).status, 403)
+      assert.ok(await findSighting('AB123CD'))
+    })
+  })
+
+  describe('mail to the author', () => {
+    test('one per decision: approved, rejected (with the reason) and superseded', async () => {
+      const alice = await loginAsVerified('alice')
+      const bob = await loginAsVerified('bob')
+      const carol = await loginAsVerified('carol')
+      await loginAsModerator()
+      await postSighting(alice, 'AB123CD')
+      await postSighting(bob, 'AD123CD')
+      await postSighting(carol, 'AE123CD')
+      await waitForMails(sentMails.length + 3) // the ones to the moderator
+      clearSentMails()
+
+      await approve('AD123CD') // supersedes alice's
+      await reject('AE123CD', 'not <readable>')
+      await waitForMails(3)
+      await waitForUnlink() // room for a wrong extra mail to show up
+
+      assert.equal(sentMails.length, 3)
+      assert.match(mailsTo('bob')[0].text, /AD 123 CD fue aprobado/)
+      assert.match(mailsTo('alice')[0].text, /AB 123 CD ya no puede ser punta/)
+      assert.match(mailsTo('carol')[0].text, /AE 123 CD fue rechazado\. Motivo: not <readable>/)
+      assert.match(mailsTo('carol')[0].html, /not &lt;readable&gt;/)
+    })
   })
 })
 
