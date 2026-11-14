@@ -6,11 +6,13 @@ import path from 'node:path'
 import mongoose from 'mongoose'
 import supertest from 'supertest'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
 
 import app from '../src/app.js'
 import config from '../src/utils/config.js'
 import User from '../src/models/user.model.js'
 import Sighting from '../src/models/sighting.model.js'
+import plateLogic from '../src/utils/logic.js'
 import { sentMails, clearSentMails } from '../src/utils/mailer.js'
 
 dns.setServers(['1.1.1.1'])
@@ -143,6 +145,18 @@ const reject = async (plate, reason = 'blurry') => {
   assert.equal(res.status, 200)
   return res
 }
+
+// a sighting stored straight in the database, skipping the API (no real photo behind it)
+const storedSighting = (user, licensePlate, fields = {}) => ({
+  user: user._id,
+  licensePlate,
+  sortKey: plateLogic.sortKey(licensePlate),
+  photoPath: 'x.png',
+  ...fields
+})
+
+// n different valid plates: AA000AA, AA001AA, ...
+const manyPlates = (n) => Array.from({ length: n }, (_, i) => `AA${String(i).padStart(3, '0')}AA`)
 
 const photoExists = (sighting) => fs.existsSync(path.join(uploadDir, path.basename(sighting.photoPath)))
 
@@ -362,6 +376,22 @@ describe('PUT /api/users/me/email', () => {
     assert.equal(taken.status, 409)
     assert.equal(taken.body.error, 'That email is already registered.')
   })
+
+  test('a verified user that changes it is unverified again and loses the pending reset link', async () => {
+    const resetToken = await requestReset()
+    const { body } = await login()
+
+    const res = await setEmail(body.token, 'new@test.com')
+    assert.equal(res.status, 200)
+    assert.equal(res.body.emailVerified, false)
+
+    // the reset link went to the previous address
+    assert.equal((await resetPassword(resetToken, 'newpass')).status, 400)
+    assert.equal((await login()).status, 403)
+
+    assert.equal((await verifyEmail(tokenFromMail('new@test.com', 'verify'))).status, 200)
+    assert.equal((await login()).status, 200)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -492,6 +522,26 @@ describe('POST /api/sightings', () => {
       assert.equal(badToken.status, 401)
     })
 
+    test('rejects a token that expired or was signed with another secret', async () => {
+      await registerVerified()
+      const payload = { username: 'tester', id: (await findUser()).id }
+
+      const expired = jwt.sign(payload, config.SECRET, { expiresIn: -10 })
+      const forged = jwt.sign(payload, `${config.SECRET}-other`, { expiresIn: '7d' })
+
+      assert.equal((await mySightings(expired)).status, 401)
+      assert.equal((await mySightings(forged)).status, 401)
+    })
+
+    test('rejects the token of a user that no longer exists', async () => {
+      const token = await loginAsVerified()
+      await User.deleteMany({})
+
+      const res = await mySightings(token)
+      assert.equal(res.status, 401)
+      assert.equal(res.body.error, 'user not found')
+    })
+
     test('rejects users without a verified email with 403 and deletes the photo', async () => {
       const token = await loginAsLegacy()
 
@@ -540,6 +590,20 @@ describe('POST /api/sightings', () => {
         contentType: 'image/png'
       })
       assert.equal(res.status, 400)
+    })
+
+    test('rejects a photo over MAX_UPLOAD_MB with 400 and keeps nothing on disk', async () => {
+      const token = await loginAsVerified()
+      const res = await postSighting(token, 'AB123CD', {
+        buffer: Buffer.alloc(config.MAX_UPLOAD_MB * 1024 * 1024 + 1)
+      })
+
+      assert.equal(res.status, 400)
+      assert.equal(res.body.error, `The image exceeds the ${config.MAX_UPLOAD_MB} MB limit.`)
+
+      await waitForUnlink()
+      assert.deepEqual(listUploads(), uploadsBefore)
+      assert.equal(await Sighting.countDocuments(), 0)
     })
   })
 
@@ -595,6 +659,18 @@ describe('POST /api/sightings', () => {
       assert.equal((await postSighting(token, 'AE123CD')).status, 202)
     })
 
+    test('two simultaneous sightings of the same plate: only one is kept', async () => {
+      const alice = await loginAsVerified('alice')
+      const bob = await loginAsVerified('bob')
+
+      const responses = await Promise.all([postSighting(alice, 'AB123CD'), postSighting(bob, 'AB123CD')])
+      assert.deepEqual(responses.map((r) => r.status).sort(), [202, 409])
+      assert.equal(await Sighting.countDocuments({ licensePlate: 'AB123CD' }), 1)
+
+      await waitForUnlink()
+      assert.equal(listUploads().size, uploadsBefore.size + 1)
+    })
+
     test('a pending sighting is not the top yet: an older plate is still accepted', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AB123CD')
@@ -613,9 +689,10 @@ describe('POST /api/sightings', () => {
       assert.equal(res.body.currentTop, 'AB123CD')
     })
 
-    test('accepts a newer plate', async () => {
+    test('accepts a plate newer than the approved top', async () => {
       const token = await loginAsVerified()
       await postSighting(token, 'AB123CD')
+      await approve('AB123CD')
 
       const res = await postSighting(token, 'AC123CD')
       assert.equal(res.status, 202)
@@ -662,6 +739,17 @@ describe('POST /api/sightings', () => {
       assert.equal(file.status, 200)
       assert.match(file.headers['content-type'], /image\/png/)
       assert.equal(file.headers['x-content-type-options'], 'nosniff')
+      assert.match(file.headers['cache-control'], /immutable/)
+    })
+
+    test('get their extension from the mimetype, not from the original name', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD', { filename: 'photo.jpeg', contentType: 'image/jpeg' })
+      await postSighting(token, 'AC123CD', { filename: 'photo.png', contentType: 'image/webp' })
+
+      const photos = Object.fromEntries((await mySightings(token)).body.map((s) => [s.plate, s.photoUrl]))
+      assert.match(photos.AB123CD, /\.jpg$/)
+      assert.match(photos.AC123CD, /\.webp$/)
     })
   })
 })
@@ -741,6 +829,17 @@ describe('GET /api/sightings/mine', () => {
     assert.equal(photos.AD123CD, null)
     assert.match(photos.AE123CD, /^\/uploads\//)
   })
+
+  test('lists at most the latest 20', async () => {
+    const token = await loginAsVerified()
+    const user = await findUser()
+    await Sighting.insertMany(manyPlates(21).map((plate, i) =>
+      storedSighting(user, plate, { status: 'rejected', createdAt: new Date(Date.now() - i * 1000) })))
+
+    const res = await mySightings(token)
+    assert.equal(res.body.length, 20)
+    assert.equal(res.body[0].plate, 'AA000AA') // the newest
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -781,6 +880,17 @@ describe('GET /api/top, /api/history and /api/ranking', () => {
 
     const res = await api.get('/api/history')
     assert.deepEqual(res.body.map((s) => s.plate), ['AC123CD', 'AB123CD'])
+  })
+
+  test('/history lists at most the latest 50', async () => {
+    const user = await User.create({ username: 'alice', passwordHash: 'x' })
+    await Sighting.insertMany(manyPlates(51).map((plate, i) =>
+      storedSighting(user, plate, { status: 'approved', createdAt: new Date(Date.now() - i * 1000) })))
+
+    const res = await api.get('/api/history')
+    assert.equal(res.body.length, 50)
+    assert.equal(res.body[0].plate, 'AA000AA') // the newest
+    assert.equal(res.body[0].photoUrl, '/uploads/x.png')
   })
 
   test('ignore pending, rejected and superseded sightings', async () => {
@@ -832,7 +942,7 @@ describe('GET /api/ranking/time', () => {
     const bob = await User.create({ username: 'bob', passwordHash: 'x' })
     const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000)
     const sighting = (user, licensePlate, createdAt) =>
-      ({ user: user._id, licensePlate, sortKey: licensePlate, photoPath: 'x.png', createdAt, status: 'approved' })
+      storedSighting(user, licensePlate, { createdAt, status: 'approved' })
 
     // alice: 10h -> 7h ago (3h); bob: 7h -> 2h ago (5h); alice again: 2h ago -> now (2h)
     await Sighting.create([
@@ -859,8 +969,8 @@ describe('GET /api/ranking/time', () => {
 
     // alice sent the newer plate first (6h ago), but bob's older one (2h ago) was the top before it
     await Sighting.create([
-      { user: alice._id, licensePlate: 'AC111AA', sortKey: 'AC-111-AA', photoPath: 'x.png', createdAt: hoursAgo(6), status: 'approved' },
-      { user: bob._id, licensePlate: 'AB111AA', sortKey: 'AB-111-AA', photoPath: 'x.png', createdAt: hoursAgo(2), status: 'approved' }
+      storedSighting(alice, 'AC111AA', { createdAt: hoursAgo(6), status: 'approved' }),
+      storedSighting(bob, 'AB111AA', { createdAt: hoursAgo(2), status: 'approved' })
     ])
 
     const time = await api.get('/api/ranking/time')
@@ -911,7 +1021,7 @@ describe('/api/moderation', () => {
       await postSighting(token, 'AE123CD')
       await postSighting(mod, 'AD123CD')
       // older than the top: can't be sent anymore, but it can be left behind by a later approval
-      await Sighting.create({ user: (await findUser())._id, licensePlate: 'AB123CD', sortKey: 'AB-123-CD', photoPath: 'x.png' })
+      await Sighting.create(storedSighting(await findUser(), 'AB123CD'))
 
       const res = await pendingQueue(mod)
       assert.equal(res.status, 200)
@@ -1010,9 +1120,7 @@ describe('/api/moderation', () => {
       await postSighting(token, 'AC123CD')
       await approve('AC123CD')
       // can only happen when two approvals race: a pending plate older than the top
-      const stale = await Sighting.create({
-        user: (await findUser())._id, licensePlate: 'AB123CD', sortKey: 'AB-123-CD', photoPath: 'x.png'
-      })
+      const stale = await Sighting.create(storedSighting(await findUser(), 'AB123CD'))
 
       const res = await approveById(await loginAsModerator(), stale.id)
       assert.equal(res.status, 409)
@@ -1063,6 +1171,30 @@ describe('/api/moderation', () => {
     })
   })
 
+  describe('two moderators at once', () => {
+    test('only one decision on the same sighting wins, and the author gets one mail', async () => {
+      const mod1 = await loginAsModerator('mod1')
+      const mod2 = await loginAsModerator('mod2')
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      const id = await idOf('AB123CD')
+      await waitForMails(sentMails.length + 2) // the ones to the moderators
+      clearSentMails()
+
+      const responses = await Promise.all([approveById(mod1, id), rejectById(mod2, id, 'blurry')])
+      assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409])
+
+      const [approved, rejected] = responses
+      const decided = await Sighting.findById(id)
+      assert.equal(decided.status, approved.status === 200 ? 'approved' : 'rejected')
+      assert.equal(decided.rejectReason, rejected.status === 200 ? 'blurry' : undefined)
+
+      await waitForMails(1)
+      await waitForUnlink() // room for a wrong extra mail to show up
+      assert.equal(mailsTo('tester').length, 1)
+    })
+  })
+
   describe('mail to the author', () => {
     test('one per decision: approved, rejected (with the reason) and superseded', async () => {
       const alice = await loginAsVerified('alice')
@@ -1086,6 +1218,19 @@ describe('/api/moderation', () => {
       assert.match(mailsTo('carol')[0].text, /AE 123 CD fue rechazado\. Motivo: not <readable>/)
       assert.match(mailsTo('carol')[0].html, /not &lt;readable&gt;/)
     })
+
+    test('none when the email of the author is no longer verified', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      await setEmail(token, 'new@test.com') // unverified from now on
+      await loginAsModerator()
+      await waitForMails(sentMails.length + 1) // the one to the moderator
+      clearSentMails()
+
+      await approve('AB123CD')
+      await waitForUnlink() // room for a wrong mail to show up
+      assert.equal(sentMails.length, 0)
+    })
   })
 })
 
@@ -1097,5 +1242,78 @@ describe('malformed requests', () => {
   test('malformed JSON answers 400, not 500', async () => {
     const res = await api.post('/api/login').set('Content-Type', 'application/json').send('{bad')
     assert.equal(res.status, 400)
+  })
+
+  test('an unexpected error answers a generic 500, without leaking its message', async (t) => {
+    t.mock.method(Sighting, 'findOne', () => { throw new Error('boom: internal detail') })
+
+    const res = await api.get('/api/top')
+    assert.equal(res.status, 500)
+    assert.deepEqual(res.body, { error: 'Internal server error.' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// App wiring: health check, headers, unknown routes and rate limit
+// ---------------------------------------------------------------------------
+
+describe('app', () => {
+  test('GET /health answers ok', async () => {
+    const res = await api.get('/health')
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body, { status: 'ok' })
+  })
+
+  test('the API is never cached and carries the security headers', async () => {
+    const res = await api.get('/api/top')
+    assert.equal(res.headers['cache-control'], 'no-cache')
+    assert.equal(res.headers['x-content-type-options'], 'nosniff')
+    assert.match(res.headers['content-security-policy'], /fonts\.googleapis\.com/)
+    assert.equal(res.headers['x-powered-by'], undefined)
+  })
+
+  test('unknown /api and /uploads paths answer 404, never the SPA or a listing', async () => {
+    for (const url of ['/api/nothing', '/api', '/uploads/nothing.png', '/uploads/', '/uploads/.gitkeep']) {
+      const res = await api.get(url)
+      assert.equal(res.status, 404, url)
+    }
+  })
+
+  // the limits are skipped with NODE_ENV=test (read on every request): turn them on for this test.
+  // Runs last: the counters are kept in memory for the whole process
+  test('rate limit: 5 per window on the mail routes, 100 on everything else but /health', async (t) => {
+    t.mock.method(console, 'log', () => {}) // the logger is not silent outside test
+    t.mock.method(console, 'error', () => {})
+    const previousEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+
+    try {
+      for (let i = 0; i < 5; i++) {
+        assert.equal((await forgotPassword('ghost@test.com')).status, 200)
+      }
+      const sixth = await forgotPassword('ghost@test.com')
+      assert.equal(sixth.status, 429)
+      assert.deepEqual(sixth.body, { error: 'Too many requests, try again later.' })
+      assert.ok(sixth.headers['retry-after'])
+
+      // the three routes share the counter; the rest of the API doesn't use it
+      assert.equal((await resendVerification('ghost@test.com')).status, 429)
+      assert.equal((await resetPassword('deadbeef', 'newpass')).status, 429)
+      assert.equal((await login('ghost')).status, 401)
+
+      // global limit: use up whatever is left of the 100
+      for (let batch = 0; batch < 5; batch++) {
+        await Promise.all(Array.from({ length: 20 }, () => api.get('/api/nothing')))
+      }
+      const blocked = await api.get('/api/top')
+      assert.equal(blocked.status, 429)
+      assert.deepEqual(blocked.body, { error: 'Too many requests, try again later.' })
+      assert.equal((await api.get('/health')).status, 200)
+    } finally {
+      process.env.NODE_ENV = previousEnv
+    }
+
+    // back in test mode nothing is limited
+    assert.equal((await api.get('/api/top')).status, 200)
   })
 })
