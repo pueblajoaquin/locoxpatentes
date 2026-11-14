@@ -61,8 +61,31 @@ nano .env
 - `APP_URL`: dominio público con HTTPS (ej. `https://tudominio.com`); es la base de los links de los mails. Sin `MAIL_USER`, `MAIL_PASS` y `APP_URL` la app no arranca.
 - `HOST=127.0.0.1` (no cambiar) y `PORT=3000`.
 - `MAX_UPLOAD_MB`: tamaño máximo de la foto (5 por defecto). Si lo subís, subí también `client_max_body_size` en Nginx.
+- `MODERATORS`: usernames de los moderadores, separados por coma (distingue mayúsculas). Ver "Moderación" más abajo.
 
 `.env` está en `.gitignore`: nunca se commitea. `chmod 600 .env`.
+
+### Moderación
+
+Cada avistamiento queda pendiente hasta que un moderador lo aprueba o lo rechaza en `https://tudominio.com/moderacion`.
+
+- Un moderador no puede moderar sus propios envíos: hacen falta **al menos 2**. Con `MODERATORS` vacía la app arranca (con un warning en el log), pero nadie puede aprobar nada.
+- Registrá y verificá las cuentas **antes** de listarlas: el registro es abierto, así que un username listado que todavía no existe lo puede registrar cualquiera.
+- Los moderadores con correo verificado reciben un mail por cada envío nuevo.
+- Para dar o quitar acceso: editá `MODERATORS` en `.env` y reiniciá con `pm2 reload locoxpatentes --update-env`. No depende del JWT: el cambio vale desde el reinicio. El moderador nuevo tiene que volver a iniciar sesión para ver el link "Moderación".
+
+### Migración de moderación (una sola vez)
+
+Toda base creada antes de la moderación necesita esta migración. Requiere **MongoDB ≥ 6.0** (Atlas lo cumple). Corréla junto con el despliegue del código nuevo, antes del `pm2 reload`:
+
+```bash
+cd ~/locoxpatentes/backend
+npm run migrate:moderation
+```
+
+Marca como `approved` los avistamientos que ya existían y reemplaza el índice único de `licensePlate` por el parcial. Es idempotente: correrla de nuevo no cambia nada. Sin ella no hay punta (ningún avistamiento viejo cuenta como aprobado) y el índice nuevo no se puede crear. En una base nueva no hace falta.
+
+Para confirmarla en Atlas: todos los documentos de `sightings` tienen `status` y el índice `licensePlate_1` tiene `partialFilterExpression`.
 
 ## 4. Arrancar con PM2
 
@@ -108,11 +131,13 @@ git pull
 pm2 reload ecosystem.config.js
 ```
 
+Si la versión nueva trae una migración (ver "Migración de moderación" en el paso 3), corréla antes del `pm2 reload`.
+
 `pm2 reload` hace un reinicio sin cortar el servicio. Si cambiaste `.env`: `pm2 reload locoxpatentes --update-env`.
 
 ## Notas sobre la app
 
-- **Fotos**: se guardan en `backend/uploads/` con nombre generado por el servidor (uuid). Al guardar un avistamiento nuevo se borra la foto de la punta anterior; los avistamientos viejos quedan en la base con una `photoUrl` que da 404 (el front solo muestra la foto de la punta). La carpeta no se versiona (solo `.gitkeep`).
+- **Fotos**: se guardan en `backend/uploads/` con nombre generado por el servidor (uuid). Solo existen las fotos de los avistamientos pendientes y la de la punta: al aprobar uno se borra la foto de la punta anterior, y al rechazarlo o quedar superado se borra la suya. Los avistamientos viejos quedan en la base con una `photoUrl` que da 404 (el front solo muestra la foto de la punta). La carpeta no se versiona (solo `.gitkeep`).
 - **Caché**: las fotos y los archivos de `/assets` se sirven como inmutables (el nombre cambia siempre); `index.html` y `/api` con `no-cache`.
 - **CORS**: no está habilitado a propósito. Front y API salen del mismo origen. Solo haría falta si el front se sirviera desde otro dominio.
 - **Seguridad**: `helmet` agrega cabeceras (CSP, HSTS, etc.); `/uploads` no lista directorios ni sirve archivos ocultos; `trust proxy` = 1 para que el rate limit use la IP real del cliente.
@@ -132,6 +157,9 @@ pm2 reload ecosystem.config.js
 - [ ] `http://tudominio.com` redirige a HTTPS.
 - [ ] `https://tudominio.com/health` → 200; una ruta del front (p. ej. `/algo`) carga la app; `/api/nada` da 404.
 - [ ] Registro → llega el mail de verificación (revisar spam) y su link abre `https://tudominio.com/?verify=…` → login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] `.env` tiene `MODERATORS` con al menos 2 usernames ya registrados y `pm2 logs` no muestra el warning de `MODERATORS` vacía.
+- [ ] Si la base ya tenía avistamientos: `npm run migrate:moderation` corrida y la punta anterior sigue apareciendo.
+- [ ] Un envío nuevo queda "Pendiente" en "Mis envíos", la punta no cambia y a los moderadores les llega el mail; otro moderador lo aprueba en `/moderacion` → cambia la punta y al autor le llega el mail.
 - [ ] "¿Olvidaste tu contraseña?" manda el mail y el link permite cambiarla.
 - [ ] Foto de más de `MAX_UPLOAD_MB` o `.gif` → error claro (400).
 - [ ] `https://tudominio.com/uploads/` no lista archivos.
