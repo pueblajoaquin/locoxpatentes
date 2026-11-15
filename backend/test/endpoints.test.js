@@ -14,6 +14,7 @@ import User from '../src/models/user.model.js'
 import Sighting from '../src/models/sighting.model.js'
 import plateLogic from '../src/utils/logic.js'
 import { sentMails, clearSentMails } from '../src/utils/mailer.js'
+import { resetModeratorNotice } from '../src/controllers/sighting.controller.js'
 
 dns.setServers(['1.1.1.1'])
 
@@ -193,6 +194,7 @@ beforeEach(async () => {
   await User.deleteMany({})
   await Sighting.deleteMany({})
   clearSentMails()
+  resetModeratorNotice() // the notices are throttled: every test starts outside the cooldown
   moderatorTokens = {}
   uploadsBefore = listUploads()
 })
@@ -772,6 +774,43 @@ describe('mail to the moderators', () => {
     assert.match(sentMails[0].text, /\/moderacion/)
   })
 
+  test('the notices are throttled: a burst of sightings sends one, with the queue size after the cooldown', async () => {
+    config.MODERATORS.add('mod1')
+    await registerVerified('mod1')
+    const token = await loginAsVerified()
+    clearSentMails()
+
+    assert.equal((await postSighting(token, 'AB123CD')).status, 202)
+    assert.equal((await postSighting(token, 'AC123CD')).status, 202)
+    await waitForMails(1)
+    await waitForUnlink() // room for a wrong extra mail to show up
+    assert.equal(sentMails.length, 1)
+    assert.match(sentMails[0].subject, /AB 123 CD/)
+    assert.doesNotMatch(sentMails[0].text, /esperando moderación/)
+
+    resetModeratorNotice() // as if the cooldown was over
+    assert.equal((await postSighting(token, 'AD123CD')).status, 202)
+    await waitForMails(2)
+    assert.equal(sentMails.length, 2)
+    assert.match(sentMails[1].text, /Hay 3 envíos esperando moderación/)
+  })
+
+  test('a notice that reached nobody does not start the cooldown', async () => {
+    config.MODERATORS.add('mod1')
+    const mod1 = await loginAsVerified('mod1')
+    const token = await loginAsVerified()
+    clearSentMails()
+
+    // the only moderator is the author: nobody to tell
+    assert.equal((await postSighting(mod1, 'AB123CD')).status, 202)
+    await waitForUnlink()
+    assert.equal(sentMails.length, 0)
+
+    assert.equal((await postSighting(token, 'AC123CD')).status, 202)
+    await waitForMails(1)
+    assert.deepEqual(sentMails.map((m) => m.to), [emailOf('mod1')])
+  })
+
   test('nothing is sent when the sighting is rejected', async () => {
     config.MODERATORS.add('mod1')
     await registerVerified('mod1')
@@ -1027,13 +1066,14 @@ describe('/api/moderation', () => {
       assert.equal(res.status, 200)
       assert.equal(res.body.currentTop, 'AC123CD')
       assert.deepEqual(
-        res.body.items.map((s) => [s.plate, s.user, s.isOwn, s.newerThanTop]),
+        res.body.items.map((s) => [s.plate, s.user, s.isOwn, s.newerThanTop, s.supersedes, s.blockedBy]),
         [
-          ['AE123CD', 'tester', false, true],
-          ['AD123CD', 'mod1', true, true],
-          ['AB123CD', 'tester', false, false]
+          ['AE123CD', 'tester', false, true, 2, null],
+          ['AD123CD', 'mod1', true, true, 1, null],
+          ['AB123CD', 'tester', false, false, 0, null]
         ]
       )
+      assert.equal(res.body.total, 3)
       assert.equal(res.body.items[0].id, await idOf('AE123CD'))
       assert.match(res.body.items[0].photoUrl, /^\/uploads\/.+\.png$/)
       assert.ok(res.body.items[0].createdAt)
@@ -1041,7 +1081,17 @@ describe('/api/moderation', () => {
 
     test('is empty, with a null top, when there is nothing', async () => {
       const res = await pendingQueue(await loginAsModerator())
-      assert.deepEqual(res.body, { currentTop: null, items: [] })
+      assert.deepEqual(res.body, { currentTop: null, total: 0, items: [] })
+    })
+
+    test('lists at most 50, but total counts the whole queue', async () => {
+      const mod = await loginAsModerator()
+      const user = await findUser('mod1')
+      await Sighting.insertMany(manyPlates(55).map((plate) => storedSighting(user, plate)))
+
+      const res = await pendingQueue(mod)
+      assert.equal(res.body.items.length, 50)
+      assert.equal(res.body.total, 55)
     })
   })
 
@@ -1068,8 +1118,8 @@ describe('/api/moderation', () => {
 
     test('supersedes the pending plates that are no longer newer, deleting their photos', async () => {
       const token = await loginAsVerified()
-      await postSighting(token, 'AB123CD')
       await postSighting(token, 'AD123CD')
+      await postSighting(token, 'AB123CD') // sent after a newer one: it never was the newest
       await postSighting(token, 'AE123CD')
 
       await approve('AD123CD')
@@ -1082,6 +1132,46 @@ describe('/api/moderation', () => {
       await waitForUnlink()
       assert.equal(photoExists(older), false)
       assert.equal(photoExists(await findSighting('AE123CD')), true)
+    })
+
+    test('an older plate that was sent before has to be decided first', async () => {
+      const mod = await loginAsModerator()
+      const token = await loginAsVerified()
+      await postSighting(token, 'AB123CD')
+      await postSighting(token, 'AC123CD')
+      await postSighting(token, 'AD123CD')
+      const newest = await idOf('AD123CD')
+
+      const blocked = await approveById(mod, newest)
+      assert.equal(blocked.status, 409)
+      assert.equal(blocked.body.error, 'older pending first')
+      assert.equal(blocked.body.blockedBy, 'AB123CD') // the one sent first
+      assert.ok(await findSighting('AD123CD'))
+      assert.ok(await findSighting('AB123CD'))
+
+      const queue = (await pendingQueue(mod)).body.items
+      assert.deepEqual(queue.map((s) => [s.plate, s.blockedBy]), [
+        ['AB123CD', null],
+        ['AC123CD', 'AB123CD'],
+        ['AD123CD', 'AB123CD']
+      ])
+
+      // rejecting is never blocked, and deciding the older ones (either way) frees the newer one
+      await reject('AB123CD')
+      await approve('AC123CD')
+      assert.equal((await approveById(mod, newest)).status, 200)
+      assert.equal((await api.get('/api/ranking')).body[0].tops, 2)
+    })
+
+    test('a pending plate that is no longer newer than the top blocks nothing', async () => {
+      const token = await loginAsVerified()
+      await postSighting(token, 'AC123CD')
+      await approve('AC123CD')
+      await Sighting.create(storedSighting(await findUser(), 'AB123CD')) // left behind by a race
+      await postSighting(token, 'AD123CD')
+
+      await approve('AD123CD')
+      assert.ok(await findSighting('AB123CD', 'superseded'))
     })
 
     test('answers 404 to an unknown or malformed id', async () => {
@@ -1193,6 +1283,27 @@ describe('/api/moderation', () => {
       await waitForUnlink() // room for a wrong extra mail to show up
       assert.equal(mailsTo('tester').length, 1)
     })
+
+    test('approving different plates at once keeps only the photo of the top', async () => {
+      const mod1 = await loginAsModerator('mod1')
+      const mod2 = await loginAsModerator('mod2')
+      const token = await loginAsVerified()
+      await postSighting(token, 'AC123CD')
+      await postSighting(token, 'AB123CD') // sent later, so it doesn't block the newer one
+      const older = await findSighting('AB123CD')
+      const newer = await findSighting('AC123CD')
+
+      // approvals run one at a time: the older one is approved first or ends up superseded
+      const [first, second] = await Promise.all([approveById(mod1, older.id), approveById(mod2, newer.id)])
+      assert.ok([200, 409].includes(first.status))
+      assert.equal(second.status, 200)
+      assert.equal((await api.get('/api/top')).body.plate, 'AC123CD')
+      assert.equal(await Sighting.countDocuments({ status: 'pending' }), 0)
+
+      await waitForUnlink()
+      assert.equal(photoExists(newer), true)
+      assert.equal(photoExists(older), false)
+    })
   })
 
   describe('mail to the author', () => {
@@ -1201,10 +1312,10 @@ describe('/api/moderation', () => {
       const bob = await loginAsVerified('bob')
       const carol = await loginAsVerified('carol')
       await loginAsModerator()
-      await postSighting(alice, 'AB123CD')
       await postSighting(bob, 'AD123CD')
+      await postSighting(alice, 'AB123CD')
       await postSighting(carol, 'AE123CD')
-      await waitForMails(sentMails.length + 3) // the ones to the moderator
+      await waitForMails(sentMails.length + 1) // the notice to the moderator (one: they are throttled)
       clearSentMails()
 
       await approve('AD123CD') // supersedes alice's
@@ -1309,6 +1420,9 @@ describe('app', () => {
       assert.equal(blocked.status, 429)
       assert.deepEqual(blocked.body, { error: 'Too many requests, try again later.' })
       assert.equal((await api.get('/health')).status, 200)
+      // the photos don't use the quota either (afterEach removes the file)
+      fs.writeFileSync(path.join(uploadDir, 'rate-limit-test.png'), PNG)
+      assert.equal((await api.get('/uploads/rate-limit-test.png')).status, 200)
     } finally {
       process.env.NODE_ENV = previousEnv
     }
