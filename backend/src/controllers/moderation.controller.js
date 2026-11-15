@@ -10,6 +10,17 @@ import { toPublic } from './game.controller.js'
 const moderationRoutes = Router()
 
 const MAX_REASON_LENGTH = 300
+const QUEUE_LIMIT = 50
+
+// approvals run one at a time (the app is a single process): each one reads the top and then
+// replaces it, so two at once would both delete the photo of the same previous top and leave
+// the photo of the one that ends up below orphaned on disk
+let approvals = Promise.resolve()
+const oneAtATime = (task) => {
+  const run = approvals.then(task)
+  approvals = run.catch(() => {})
+  return run
+}
 
 moderationRoutes.use(middlewares.tokenExtractor, middlewares.userExtractor, middlewares.requireModerator)
 
@@ -60,19 +71,32 @@ const findModerable = async (req, res) => {
 // GET /api/moderation/pending: the queue, oldest first (approving in that order supersedes fewer)
 moderationRoutes.get('/pending', async (req, res, next) => {
   try {
-    const [pending, top] = await Promise.all([
-      Sighting.find({ status: 'pending' }).sort({ createdAt: 1 }).populate('user', 'username'),
+    const [pending, keys, top] = await Promise.all([
+      Sighting.find({ status: 'pending' }).sort({ createdAt: 1 }).limit(QUEUE_LIMIT).populate('user', 'username'),
+      // the whole queue, not only the page, oldest first
+      Sighting.find({ status: 'pending' }, 'sortKey licensePlate createdAt').sort({ createdAt: 1 }).lean(),
       findApprovedTop()
     ])
 
     return res.status(200).json({
       currentTop: top?.licensePlate ?? null,
-      items: pending.map((s) => ({
-        id: s.id,
-        ...toPublic(s),
-        isOwn: Boolean(s.user?._id.equals(req.user._id)),
-        newerThanTop: !top || s.sortKey > top.sortKey
-      }))
+      total: keys.length,
+      items: pending.map((s) => {
+        const newerThanTop = !top || s.sortKey > top.sortKey
+        // same rule as approve: an older plate sent before this one has to be decided first
+        const sentBefore = newerThanTop
+          ? keys.find((k) => k.createdAt < s.createdAt && k.sortKey < s.sortKey && (!top || k.sortKey > top.sortKey))
+          : undefined
+        return {
+          id: s.id,
+          ...toPublic(s),
+          isOwn: Boolean(s.user?._id.equals(req.user._id)),
+          newerThanTop,
+          blockedBy: sentBefore?.licensePlate ?? null,
+          // how many other pending sightings approving this one would supersede
+          supersedes: newerThanTop ? keys.filter((k) => k.sortKey < s.sortKey).length : 0
+        }
+      })
     })
   } catch (error) {
     next(error)
@@ -82,32 +106,47 @@ moderationRoutes.get('/pending', async (req, res, next) => {
 // POST /api/moderation/:id/approve: the sighting becomes the top
 moderationRoutes.post('/:id/approve', async (req, res, next) => {
   try {
-    const sighting = await findModerable(req, res)
-    if (!sighting) return
+    await oneAtATime(async () => {
+      const sighting = await findModerable(req, res)
+      if (!sighting) return
 
-    // checked again here: another plate may have been approved since it was sent
-    const previousTop = await findApprovedTop()
-    if (previousTop && sighting.sortKey <= previousTop.sortKey) {
-      await supersede(sighting._id, req.user)
-      return res.status(409).json({ error: 'superseded', currentTop: previousTop.licensePlate })
-    }
+      // checked again here: another plate may have been approved since it was sent
+      const previousTop = await findApprovedTop()
+      if (previousTop && sighting.sortKey <= previousTop.sortKey) {
+        await supersede(sighting._id, req.user)
+        return res.status(409).json({ error: 'superseded', currentTop: previousTop.licensePlate })
+      }
 
-    const approved = await decide(sighting._id, req.user, { status: 'approved' })
-    if (!approved) {
-      return res.status(409).json({ error: 'already decided' })
-    }
+      // approving this one would supersede a plate that was sent before it and may be legitimate:
+      // that one has to be decided first (plates sent later are superseded below, as they never were the newest)
+      const sentBefore = await Sighting.findOne({
+        status: 'pending',
+        createdAt: { $lt: sighting.createdAt },
+        sortKey: { $lt: sighting.sortKey, ...(previousTop && { $gt: previousTop.sortKey }) }
+      }).sort({ createdAt: 1 })
+      if (sentBefore) {
+        return res.status(409).json({ error: 'older pending first', blockedBy: sentBefore.licensePlate })
+      }
 
-    // only the photo of the current top is kept
-    if (previousTop) removeStoredFile(previousTop.photoPath)
+      const approved = await decide(sighting._id, req.user, { status: 'approved' })
+      if (!approved) {
+        return res.status(409).json({ error: 'already decided' })
+      }
 
-    // the pending ones that are now older than the top can't be approved anymore
-    const outdated = await Sighting.find({ status: 'pending', sortKey: { $lte: approved.sortKey } }, '_id')
-    for (const { _id } of outdated) {
-      await supersede(_id, req.user)
-    }
+      // the approval is done: the author hears about it even if the cleanup below fails
+      notifyAuthor(approved)
 
-    notifyAuthor(approved)
-    return res.status(200).json(toPublic(approved))
+      // only the photo of the current top is kept
+      if (previousTop) removeStoredFile(previousTop.photoPath)
+
+      // the pending ones that are now older than the top can't be approved anymore
+      const outdated = await Sighting.find({ status: 'pending', sortKey: { $lte: approved.sortKey } }, '_id')
+      for (const { _id } of outdated) {
+        await supersede(_id, req.user)
+      }
+
+      return res.status(200).json(toPublic(approved))
+    })
   } catch (error) {
     next(error)
   }
