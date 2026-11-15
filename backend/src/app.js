@@ -46,6 +46,18 @@ app.use(express.static(distDir, {
   }
 }))
 
+// uploaded photos: served as static files from /uploads (no directory listing, no dotfiles)
+// every photo has a unique uuid name, so it can be cached for good
+// nosniff: the browser must not reinterpret a file as something other than its served type
+// before the rate limit: a moderator loads one photo per pending sighting
+app.use('/uploads', express.static(uploadDir, {
+  index: false,
+  dotfiles: 'ignore',
+  maxAge: '30d',
+  immutable: true,
+  setHeaders: (res) => res.set('X-Content-Type-Options', 'nosniff')
+}))
+
 // basic global rate limit per IP: 100 requests every 15 minutes
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -75,17 +87,6 @@ app.use([
 app.use(express.json())
 
 app.use(middlewares.requestLogger)
-
-// uploaded photos: served as static files from /uploads (no directory listing, no dotfiles)
-// every photo has a unique uuid name, so it can be cached for good
-// nosniff: the browser must not reinterpret a file as something other than its served type
-app.use('/uploads', express.static(uploadDir, {
-  index: false,
-  dotfiles: 'ignore',
-  maxAge: '30d',
-  immutable: true,
-  setHeaders: (res) => res.set('X-Content-Type-Options', 'nosniff')
-}))
 
 // the current top changes with every sighting: never serve it from cache
 app.use('/api', (req, res, next) => {
