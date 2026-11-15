@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import * as api from '../api.js'
-import { formatDate } from '../format.js'
+import { formatDate, formatPlate } from '../format.js'
 import Plate from './Plate.jsx'
 
 const OTHER = 'Otro'
@@ -16,7 +16,8 @@ const REASONS = [
 const MAX_DETAIL = 250
 
 function PendingItem ({ item, busy, onApprove, onReject }) {
-  const [rejecting, setRejecting] = useState(false)
+  // null: the two buttons; 'approve' / 'reject': the confirmation step of that decision
+  const [mode, setMode] = useState(null)
   const [reason, setReason] = useState(REASONS[0])
   const [detail, setDetail] = useState('')
 
@@ -32,7 +33,7 @@ function PendingItem ({ item, busy, onApprove, onReject }) {
   return (
     <section className='card mod-item'>
       <a className='mod-photo' href={item.photoUrl} target='_blank' rel='noreferrer' title='Abrir la foto en una pestaña nueva'>
-        <img src={item.photoUrl} alt={`Foto enviada para la patente ${item.plate}`} />
+        <img src={item.photoUrl} loading='lazy' alt={`Foto enviada para la patente ${item.plate}`} />
       </a>
       <div className='mod-info'>
         <Plate plate={item.plate} />
@@ -44,18 +45,46 @@ function PendingItem ({ item, busy, onApprove, onReject }) {
 
         {item.isOwn && <p className='muted'>No podés moderar tus envíos.</p>}
 
-        {!rejecting && (
+        {item.blockedBy && (
+          <p className='muted'>
+            Para aprobarla, primero hay que decidir {formatPlate(item.blockedBy)}: se envió antes y quedaría superada.
+          </p>
+        )}
+
+        {!mode && (
           <div className='actions'>
-            <button type='button' className='button' disabled={busy || item.isOwn} onClick={() => onApprove(item.id)}>
+            <button type='button' className='button' disabled={busy || item.isOwn || Boolean(item.blockedBy)} onClick={() => setMode('approve')}>
               Aprobar
             </button>
-            <button type='button' className='button danger' disabled={busy || item.isOwn} onClick={() => setRejecting(true)}>
+            <button type='button' className='button danger' disabled={busy || item.isOwn} onClick={() => setMode('reject')}>
               Rechazar
             </button>
           </div>
         )}
 
-        {rejecting && (
+        {/* approving can't be undone: it replaces the top and deletes photos, so it takes a second click */}
+        {mode === 'approve' && (
+          <div>
+            <p>¿Aprobar {formatPlate(item.plate)} como nueva punta? No se puede deshacer.</p>
+            {item.supersedes > 0 && (
+              <p className='error' role='alert'>
+                {item.supersedes === 1
+                  ? 'Hay 1 envío posterior con una patente más vieja: va a quedar superado.'
+                  : `Hay ${item.supersedes} envíos posteriores con patentes más viejas: van a quedar superados.`}
+              </p>
+            )}
+            <div className='actions'>
+              <button type='button' className='button' disabled={busy} onClick={() => onApprove(item.id)}>
+                Confirmar aprobación
+              </button>
+              <button type='button' className='button secondary' disabled={busy} onClick={() => setMode(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'reject' && (
           <form onSubmit={submitReject}>
             <label htmlFor={`reason-${item.id}`}>Motivo del rechazo</label>
             <select id={`reason-${item.id}`} className='input' value={reason} onChange={(e) => setReason(e.target.value)}>
@@ -75,7 +104,7 @@ function PendingItem ({ item, busy, onApprove, onReject }) {
               <button className='button danger' disabled={busy || (detailRequired && !trimmed)}>
                 Confirmar rechazo
               </button>
-              <button type='button' className='button secondary' disabled={busy} onClick={() => setRejecting(false)}>
+              <button type='button' className='button secondary' disabled={busy} onClick={() => setMode(null)}>
                 Cancelar
               </button>
             </div>
@@ -90,6 +119,7 @@ export default function ModerationPage () {
   const [queue, setQueue] = useState(null) // { currentTop, items }
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const acting = useRef(false)
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +136,9 @@ export default function ModerationPage () {
   // runs the action and reloads the queue either way: on a failure (already
   // decided, superseded) the list on screen is stale too
   const act = async (action) => {
+    // `busy` only disables the buttons on the next render: the ref stops a double click right away
+    if (acting.current) return
+    acting.current = true
     setBusy(true)
     setError(null)
     let failure = null
@@ -116,6 +149,7 @@ export default function ModerationPage () {
     }
     await load()
     if (failure) setError(failure)
+    acting.current = false
     setBusy(false)
   }
 
@@ -135,9 +169,10 @@ export default function ModerationPage () {
           <div className='label'>Moderación</div>
           {queue && (
             <p className='muted'>
-              {queue.items.length === 0
+              {queue.total === 0
                 ? 'No hay envíos pendientes.'
-                : `${queue.items.length} ${queue.items.length === 1 ? 'envío pendiente' : 'envíos pendientes'}, del más viejo al más nuevo.`}
+                : `${queue.total} ${queue.total === 1 ? 'envío pendiente' : 'envíos pendientes'}, del más viejo al más nuevo.`}
+              {queue.total > queue.items.length && ` Se muestran los primeros ${queue.items.length}.`}
             </p>
           )}
           {error && <p className='error' role='alert'>{error}</p>}

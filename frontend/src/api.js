@@ -32,6 +32,7 @@ const MESSAGES_ES = {
   'too many pending sightings': 'Ya tenés 3 envíos pendientes. Esperá a que se moderen.',
   'already decided': 'Ese avistamiento ya fue moderado.',
   superseded: 'Ya se aprobó una patente más nueva; quedó superada.',
+  'older pending first': 'Primero hay que decidir un envío anterior con una patente más vieja.',
   'cannot moderate own sighting': 'No podés moderar tus propios envíos.',
   'moderator only': 'Solo para moderadores.',
   'sighting not found': 'Ese avistamiento no existe.',
