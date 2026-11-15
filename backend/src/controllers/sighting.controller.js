@@ -20,15 +20,42 @@ const ALIVE = ['pending', 'approved']
 
 const findApprovedTop = () => Sighting.findOne({ status: 'approved' }).sort({ sortKey: -1 })
 
+// at most one notice to the moderators per window: one mail per sighting would let a burst of
+// submissions use up the daily quota of the mail account, which also sends the verification mails
+const NOTICE_COOLDOWN_MS = 15 * 60 * 1000
+let lastNoticeAt = 0
+
+// test only: the timestamp lives in memory for the whole process
+export const resetModeratorNotice = () => {
+  lastNoticeAt = 0
+}
+
 // mail to the moderators with a verified email, except the author (who can't moderate it anyway)
 const notifyModerators = async (sighting, author) => {
   if (config.MODERATORS.size === 0) return
-  const moderators = await User.find({
-    username: { $in: [...config.MODERATORS] },
-    emailVerified: true,
-    _id: { $ne: author._id }
-  })
-  await sendNewSubmissionEmail(moderators, sighting, author.username)
+  const previousNoticeAt = lastNoticeAt
+  if (Date.now() - previousNoticeAt < NOTICE_COOLDOWN_MS) return
+  lastNoticeAt = Date.now() // taken before the first await: simultaneous submissions send one notice
+
+  try {
+    const [moderators, pending] = await Promise.all([
+      User.find({
+        username: { $in: [...config.MODERATORS] },
+        emailVerified: true,
+        _id: { $ne: author._id }
+      }),
+      Sighting.countDocuments({ status: 'pending' })
+    ])
+    // nobody was told: the next submission tries again
+    if (moderators.length === 0) {
+      lastNoticeAt = previousNoticeAt
+      return
+    }
+    await sendNewSubmissionEmail(moderators, sighting, author.username, pending)
+  } catch (error) {
+    lastNoticeAt = previousNoticeAt
+    throw error
+  }
 }
 
 // the user comes from the JWT, not from the body

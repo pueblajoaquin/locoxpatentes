@@ -44,19 +44,23 @@ const send = async ({ to, subject, text, html }) => {
 // AB123CD -> AB 123 CD (same as formatPlate in the frontend)
 const formatPlate = (plate) => plate.replace(/^([A-Z]{2})(\d{3})([A-Z]{2})$/, '$1 $2 $3')
 
-// one mail per moderator, so no address is shown to the others
-export const sendNewSubmissionEmail = (moderators, sighting, username) => {
+// one mail per moderator, so no address is shown to the others.
+// pending: sightings waiting in the queue, this one included (the notices are throttled)
+export const sendNewSubmissionEmail = (moderators, sighting, username, pending = 1) => {
   const plate = formatPlate(sighting.licensePlate)
   const link = `${config.APP_URL}/moderacion`
   const name = escapeHtml(username)
+  const queue = pending > 1 ? ` Hay ${pending} envíos esperando moderación.` : ''
+  const throttle = 'Si llegan más envíos en los próximos 15 minutos no vas a recibir otro aviso.'
 
   return Promise.all(moderators.map((moderator) => send({
     to: moderator.email,
     subject: `Nuevo avistamiento para moderar: ${plate}`,
-    text: `${username} envió la patente ${plate}.\n\n` +
-      `Para aprobarla o rechazarla entrá a:\n${link}`,
-    html: `<p>${name} envió la patente ${plate}.</p>` +
-      `<p><a href="${link}">Ir a moderación</a></p>`
+    text: `${username} envió la patente ${plate}.${queue}\n\n` +
+      `Para aprobarla o rechazarla entrá a:\n${link}\n\n${throttle}`,
+    html: `<p>${name} envió la patente ${plate}.${queue}</p>` +
+      `<p><a href="${link}">Ir a moderación</a></p>` +
+      `<p>${throttle}</p>`
   })))
 }
 
