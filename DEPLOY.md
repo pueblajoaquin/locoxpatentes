@@ -61,8 +61,38 @@ nano .env
 - `APP_URL`: dominio público con HTTPS (ej. `https://tudominio.com`); es la base de los links de los mails. Sin `MAIL_USER`, `MAIL_PASS` y `APP_URL` la app no arranca.
 - `HOST=127.0.0.1` (no cambiar) y `PORT=3000`.
 - `MAX_UPLOAD_MB`: tamaño máximo de la foto (5 por defecto). Si lo subís, subí también `client_max_body_size` en Nginx.
+- `MODERATORS`: usernames de los moderadores, separados por coma (distingue mayúsculas). Ver "Moderación" más abajo.
 
 `.env` está en `.gitignore`: nunca se commitea. `chmod 600 .env`.
+
+### Moderación
+
+Cada avistamiento queda pendiente hasta que un moderador lo aprueba o lo rechaza en `https://tudominio.com/moderacion`.
+
+- Un moderador no puede moderar sus propios envíos: hacen falta **al menos 2**. Con `MODERATORS` vacía la app arranca (con un warning en el log), pero nadie puede aprobar nada.
+- Registrá y verificá las cuentas **antes** de listarlas: el registro es abierto, así que un username listado que todavía no existe lo puede registrar cualquiera.
+- Al arrancar, la app deja un warning en el log por cada username de `MODERATORS` que no esté registrado.
+- Los moderadores con correo verificado reciben un mail cuando llega un envío nuevo, como máximo uno cada 15 minutos (dice cuántos hay en la cola). Así una ráfaga de envíos no agota la cuota diaria de Gmail, que también manda los mails de verificación. El contador vive en memoria: se reinicia con la app.
+- No se puede aprobar una patente mientras haya pendiente otra más vieja que se envió antes: primero hay que aprobar o rechazar esa (la web dice cuál). Si esa es de un moderador, la tiene que decidir otro.
+- Aprobar pide confirmación y **no se puede deshacer** desde la web: cambia la punta, borra la foto de la anterior y supera a las pendientes más viejas.
+- Para dar o quitar acceso: editá `MODERATORS` en `.env` y reiniciá con `pm2 reload locoxpatentes --update-env`. No depende del JWT: el cambio vale desde el reinicio. El moderador nuevo tiene que volver a iniciar sesión para ver el link "Moderación".
+
+### Migración de moderación (una sola vez)
+
+Toda base creada antes de la moderación necesita esta migración. Requiere **MongoDB ≥ 6.0** (Atlas lo cumple). Corréla con la app **detenida**: si el código viejo sigue atendiendo mientras corre, puede guardar avistamientos sin `status`.
+
+```bash
+cd ~/locoxpatentes
+pm2 stop locoxpatentes
+git pull
+(cd backend && npm ci --omit=dev && npm run migrate:moderation)
+(cd frontend && npm ci && npx vite build --outDir ../backend/dist --emptyOutDir)
+pm2 start ecosystem.config.js
+```
+
+Marca como `approved` los avistamientos que ya existían y reemplaza el índice único de `licensePlate` por el parcial. Es idempotente: correrla de nuevo no cambia nada. Si queda algún avistamiento sin `status`, la app **no arranca** y el log pide correr la migración (sin ella no habría punta y el índice nuevo no se podría crear). En una base nueva no hace falta.
+
+Para confirmarla en Atlas: todos los documentos de `sightings` tienen `status` y el índice `licensePlate_1` tiene `partialFilterExpression`.
 
 ## 4. Arrancar con PM2
 
@@ -108,14 +138,16 @@ git pull
 pm2 reload ecosystem.config.js
 ```
 
+Si la versión nueva trae una migración, seguí los pasos de "Migración de moderación" (paso 3) en lugar de estos: la app se detiene mientras corre.
+
 `pm2 reload` hace un reinicio sin cortar el servicio. Si cambiaste `.env`: `pm2 reload locoxpatentes --update-env`.
 
 ## Notas sobre la app
 
-- **Fotos**: se guardan en `backend/uploads/` con nombre generado por el servidor (uuid). Al guardar un avistamiento nuevo se borra la foto de la punta anterior; los avistamientos viejos quedan en la base con una `photoUrl` que da 404 (el front solo muestra la foto de la punta). La carpeta no se versiona (solo `.gitkeep`).
+- **Fotos**: se guardan en `backend/uploads/` con nombre generado por el servidor (uuid). Solo existen las fotos de los avistamientos pendientes y la de la punta: al aprobar uno se borra la foto de la punta anterior, y al rechazarlo o quedar superado se borra la suya. Los avistamientos viejos quedan en la base con una `photoUrl` que da 404 (el front solo muestra la foto de la punta). La carpeta no se versiona (solo `.gitkeep`).
 - **Caché**: las fotos y los archivos de `/assets` se sirven como inmutables (el nombre cambia siempre); `index.html` y `/api` con `no-cache`.
 - **CORS**: no está habilitado a propósito. Front y API salen del mismo origen. Solo haría falta si el front se sirviera desde otro dominio.
-- **Seguridad**: `helmet` agrega cabeceras (CSP, HSTS, etc.); `/uploads` no lista directorios ni sirve archivos ocultos; `trust proxy` = 1 para que el rate limit use la IP real del cliente.
+- **Seguridad**: `helmet` agrega cabeceras (CSP, HSTS, etc.); `/uploads` no lista directorios ni sirve archivos ocultos; `trust proxy` = 1 para que el rate limit use la IP real del cliente. Las fotos y el front no consumen el rate limit; la API sí.
 - **Backups**: las fotos viven solo en el disco del servidor; hacé snapshots de DonWeb o `rsync` de `backend/uploads`.
 
 ## Checklist final
@@ -132,6 +164,9 @@ pm2 reload ecosystem.config.js
 - [ ] `http://tudominio.com` redirige a HTTPS.
 - [ ] `https://tudominio.com/health` → 200; una ruta del front (p. ej. `/algo`) carga la app; `/api/nada` da 404.
 - [ ] Registro → llega el mail de verificación (revisar spam) y su link abre `https://tudominio.com/?verify=…` → login y envío de una patente con foto funcionan; la foto se ve.
+- [ ] `.env` tiene `MODERATORS` con al menos 2 usernames ya registrados y `pm2 logs` no muestra warnings de `MODERATORS` (vacía o con un username sin registrar).
+- [ ] Si la base ya tenía avistamientos: `npm run migrate:moderation` corrida y la punta anterior sigue apareciendo.
+- [ ] Un envío nuevo queda "Pendiente" en "Mis envíos", la punta no cambia y a los moderadores les llega el mail; otro moderador lo aprueba en `/moderacion` → cambia la punta y al autor le llega el mail.
 - [ ] "¿Olvidaste tu contraseña?" manda el mail y el link permite cambiarla.
 - [ ] Foto de más de `MAX_UPLOAD_MB` o `.gif` → error claro (400).
 - [ ] `https://tudominio.com/uploads/` no lista archivos.

@@ -101,6 +101,22 @@ describe('computeTimeRanking', () => {
     assert.equal(result[0].userId, 'b')
   })
 
+  test('a sighting sent before the top it replaces starts when that top did', () => {
+    // sorted by sortKey: b was sent later (t30) but was the top first; a (sent at t10) replaced it
+    const result = logic.computeTimeRanking([
+      { user: 'c', createdAt: t(0) },
+      { user: 'b', createdAt: t(30) },
+      { user: 'a', createdAt: t(10) }
+    ], now)
+    assert.deepEqual(result, [
+      { userId: 'a', totalMs: 70000, isCurrentTop: true },
+      { userId: 'c', totalMs: 30000, isCurrentTop: false },
+      { userId: 'b', totalMs: 0, isCurrentTop: false }
+    ])
+    // nothing is counted twice: the total is now - first createdAt
+    assert.equal(result.reduce((sum, r) => sum + r.totalMs, 0), 100000)
+  })
+
   test('compares ObjectId-like users by their string value', () => {
     const id = () => ({ toString: () => 'same-id' })
     const result = logic.computeTimeRanking([
@@ -109,6 +125,22 @@ describe('computeTimeRanking', () => {
     ], now)
     assert.equal(result.length, 1)
     assert.equal(result[0].totalMs, 100000)
+  })
+})
+
+describe('topSince', () => {
+  const t = (seconds) => new Date(2026, 0, 1, 0, 0, seconds)
+
+  test('is null when there are no sightings', () => {
+    assert.equal(logic.topSince([]), null)
+  })
+
+  test('is the createdAt of the last one when they were approved in order', () => {
+    assert.deepEqual(logic.topSince([{ createdAt: t(0) }, { createdAt: t(30) }]), t(30))
+  })
+
+  test('is the start of the previous top when the last one was sent before it', () => {
+    assert.deepEqual(logic.topSince([{ createdAt: t(0) }, { createdAt: t(30) }, { createdAt: t(10) }]), t(30))
   })
 })
 

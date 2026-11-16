@@ -15,6 +15,11 @@ const MAIL_FROM = process.env.MAIL_FROM || MAIL_USER
 // base of the links sent by mail (verify / reset)
 const APP_URL = process.env.APP_URL
 
+// usernames (case-sensitive, comma-separated) allowed to moderate sightings
+const MODERATORS = new Set(
+  (process.env.MODERATORS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+)
+
 export default {
   PORT,
   HOST,
@@ -24,5 +29,6 @@ export default {
   MAIL_USER,
   MAIL_PASS,
   MAIL_FROM,
-  APP_URL
+  APP_URL,
+  MODERATORS
 }

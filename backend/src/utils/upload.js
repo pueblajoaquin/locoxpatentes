@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 
 import config from './config.js'
+import logger from './logger.js'
 
 // single source of truth: allowed mimetypes and the extension each one gets
 const EXTENSIONS = {
@@ -39,6 +40,22 @@ const fileFilter = (req, file, cb) => {
     // MulterError so the errorHandler translates it into a 400
     cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname))
   }
+}
+
+// the photo is already on disk once multer has processed it,
+// so if the request is rejected afterwards it has to be deleted
+export const removeUploadedFile = (file) => {
+  if (file?.path) {
+    fs.unlink(file.path, () => {}) // best-effort: if it no longer exists, it doesn't matter
+  }
+}
+
+// same for the photo of a saved sighting that is no longer needed; a missing file is not an error
+// (only the basename is used, so a stale absolute path can't point outside uploads)
+export const removeStoredFile = (photoPath) => {
+  fs.promises.unlink(path.join(uploadDir, path.basename(photoPath))).catch((error) => {
+    if (error.code !== 'ENOENT') logger.error(error.message)
+  })
 }
 
 const upload = multer({

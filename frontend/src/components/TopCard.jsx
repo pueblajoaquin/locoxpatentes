@@ -26,7 +26,7 @@ export default function TopCard ({ top, sightings }) {
         <div className='stats'>
           <div className='stat'>
             <span className='muted'>Tiempo como punta</span>
-            <span className='stat-value'>{formatDuration(Date.now() - new Date(top.createdAt))}</span>
+            <span className='stat-value'>{formatDuration(Date.now() - new Date(top.since ?? top.createdAt))}</span>
           </div>
           <div className='stat'>
             <span className='muted'>Avistamientos</span>
