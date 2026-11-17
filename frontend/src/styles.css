@@ -20,7 +20,7 @@ body {
   font: 400 16px/1.5 'Barlow', sans-serif;
 }
 
-h3, .logo, .label, .stat-value, .button, .plate-input, .value, .pos {
+h3, .logo, .label, .stat-value, .button, .plate-input, .value, .pos, .step-num {
   font-family: 'Barlow Condensed', sans-serif;
 }
 
@@ -32,7 +32,7 @@ a { color: inherit; }
 }
 .logo { display: inline-flex; align-items: center; gap: 10px; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-decoration: none; margin-right: auto; }
 .logo-img { height: 44px; width: auto; }
-.nav { display: flex; gap: 20px; }
+.nav { display: flex; flex-wrap: wrap; gap: 0 20px; }
 .nav a { color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 .nav a:hover { color: var(--text); }
 
@@ -119,3 +119,20 @@ textarea.input { resize: vertical; display: block; }
 .mod-photo img { display: block; width: 100%; max-height: 75vh; object-fit: contain; }
 .mod-info { flex: 1 1 280px; min-width: 0; max-width: 460px; }
 .mod-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 16px; }
+
+/* "how to play" block on the home: open for visitors, collapsed for logged in players */
+.how summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+.how summary::-webkit-details-marker { display: none; }
+.how summary::after { content: '+'; margin-left: auto; color: var(--muted); font-size: 24px; line-height: 1; }
+.how details[open] summary { margin-bottom: 16px; }
+.how details[open] summary::after { content: '–'; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 20px; }
+.step { flex: 1 1 260px; background: var(--bg); border-radius: 12px; padding: 16px; }
+.step h3 { margin: 8px 0; font-size: 22px; text-transform: uppercase; letter-spacing: .04em; }
+.step p { margin: 0; }
+.step-num { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--bg); display: grid; place-items: center; font-weight: 700; }
+.plate-examples { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.plate-sign { flex: none; color: var(--muted); font: 700 22px/1 'Barlow Condensed', sans-serif; }
+.plate-examples .plate-wrap { flex: 1 1 0; min-width: 0; }
+.plate-examples .plate { border-width: 2px; border-radius: 8px; }
+.how-cta { display: inline-block; margin-top: 16px; color: var(--accent); }

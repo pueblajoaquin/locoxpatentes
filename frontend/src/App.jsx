@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import * as api from './api.js'
 import Header from './components/Header.jsx'
+import HowToPlay from './components/HowToPlay.jsx'
 import ModerationPage from './components/ModerationPage.jsx'
 import RankingList from './components/RankingList.jsx'
 import ResetPasswordForm from './components/ResetPasswordForm.jsx'
@@ -99,6 +100,8 @@ export default function App () {
     <>
       <Header />
       <main className='page'>
+        {/* outside the data block: it shows even if loading fails. Visitors get it first */}
+        {!username && <HowToPlay />}
         {error && <p className='error' role='alert'>{error}</p>}
         {!data && !error && <p className='muted'>Cargando…</p>}
         {data && (
@@ -124,6 +127,8 @@ export default function App () {
             </div>
           </>
         )}
+        {/* a different position remounts it on login, so it starts collapsed */}
+        {username && <HowToPlay />}
       </main>
     </>
   )

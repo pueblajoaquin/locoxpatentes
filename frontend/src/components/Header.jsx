@@ -15,6 +15,7 @@ export default function Header ({ moderation = false }) {
           ? <a href='/'>Inicio</a>
           : (
             <>
+              <a href='#como-jugar'>Cómo se juega</a>
               <a href='#top'>Punta actual</a>
               <a href='#submit'>Enviar</a>
               <a href='#rankings'>Rankings</a>
