@@ -5,8 +5,24 @@ import Plate from './Plate.jsx'
 
 const ANCHOR = '#como-jugar'
 
-// fixed examples, oldest to newest: final letters roll over first, then the number, then the first letters
-const EXAMPLE_PLATES = ['AF123ZZ', 'AF124AA', 'AG000AA']
+// fixed examples, oldest to newest: each step is a rollover, so the plate that "looks smaller"
+// is the newer one (ZZ -> number + 1 -> AA, then the first letters beat any number)
+const EXAMPLE_PLATES = ['AF345ZZ', 'AF346AA', 'AG000AA']
+// longer sequence behind "Ver más ejemplos", from the very first plate
+const MORE_PLATES = ['AA000AA', 'AA000AB', 'AA000ZZ', 'AA001AA', 'AA999AA', 'AB000AA']
+
+function PlateSequence ({ plates, className = 'plate-examples' }) {
+  return (
+    <div className={className}>
+      {plates.map((plate, i) => (
+        <Fragment key={plate}>
+          {i > 0 && <span className='plate-sign' aria-hidden='true'>{'<'}</span>}
+          <div className='plate-example'><Plate plate={plate} /></div>
+        </Fragment>
+      ))}
+    </div>
+  )
+}
 
 export default function HowToPlay () {
   const { username } = useAuth()
@@ -43,14 +59,11 @@ export default function HowToPlay () {
               Las patentes salen en orden: primero avanzan las dos letras finales, después el
               número y al final las dos letras iniciales.
             </p>
-            <div className='plate-examples'>
-              {EXAMPLE_PLATES.map((plate, i) => (
-                <Fragment key={plate}>
-                  {i > 0 && <span className='plate-sign' aria-hidden='true'>{'<'}</span>}
-                  <Plate plate={plate} />
-                </Fragment>
-              ))}
-            </div>
+            <PlateSequence plates={EXAMPLE_PLATES} />
+            <details className='more-examples'>
+              <summary>Ver más ejemplos</summary>
+              <PlateSequence plates={MORE_PLATES} className='plate-examples wrap' />
+            </details>
           </li>
           <li className='step'>
             <span className='step-num' aria-hidden='true'>2</span>
